@@ -8,4 +8,8 @@ git submodule update --init dtc
 then I was able to get jos running on the vm but I am now running into an
 issue getting jos to see qemu
 
-still currently troubleshooting
+had to puth the path in when running ./configure and then run make and make install in the correct location
+
+had to change make install to sudo make install
+
+finally got everything running properly 
