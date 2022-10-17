@@ -1,0 +1,11 @@
+When installing QEMU i ran into an issue and found that I also needed to
+ run the following prior to make && make install
+
+git submodule update --init dtc
+
+
+
+then I was able to get jos running on the vm but I am now running into an
+issue getting jos to see qemu
+
+still currently troubleshooting
