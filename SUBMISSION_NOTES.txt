@@ -16,4 +16,4 @@ had to change make install to sudo make install
 finally got everything running properly 
 
 Lab2: 
-Test
+completed late
