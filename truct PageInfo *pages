@@ -1,0 +1,1756 @@
+[1mdiff --git a/GNUmakefile b/GNUmakefile[m
+[1mindex 115c1bf..1820f31 100644[m
+[1m--- a/GNUmakefile[m
+[1m+++ b/GNUmakefile[m
+[36m@@ -138,6 +138,8 @@[m [m$(OBJDIR)/.vars.%: FORCE[m
+ # Include Makefrags for subdirectories[m
+ include boot/Makefrag[m
+ include kern/Makefrag[m
+[32m+[m[32minclude lib/Makefrag[m
+[32m+[m[32minclude user/Makefrag[m
+ [m
+ [m
+ QEMUOPTS = -drive file=$(OBJDIR)/kern/kernel.img,index=0,media=disk,format=raw -serial mon:stdio -gdb tcp::$(GDBPORT)[m
+[36m@@ -298,6 +300,22 @@[m [mmyapi.key:[m
+ #handin-prep:[m
+ #	@./handin-prep[m
+ [m
+[32m+[m[32m# For test runs[m
+[32m+[m
+[32m+[m[32mprep-%:[m
+[32m+[m	[32m$(V)$(MAKE) "INIT_CFLAGS=${INIT_CFLAGS} -DTEST=`case $* in *_*) echo $*;; *) echo user_$*;; esac`" $(IMAGES)[m
+[32m+[m
+[32m+[m[32mrun-%-nox-gdb: prep-% pre-qemu[m
+[32m+[m	[32m$(QEMU) -nographic $(QEMUOPTS) -S[m
+[32m+[m
+[32m+[m[32mrun-%-gdb: prep-% pre-qemu[m
+[32m+[m	[32m$(QEMU) $(QEMUOPTS) -S[m
+[32m+[m
+[32m+[m[32mrun-%-nox: prep-% pre-qemu[m
+[32m+[m	[32m$(QEMU) -nographic $(QEMUOPTS)[m
+[32m+[m
+[32m+[m[32mrun-%: prep-% pre-qemu[m
+[32m+[m	[32m$(QEMU) $(QEMUOPTS)[m
+ [m
+ # This magic automatically generates makefile dependencies[m
+ # for header files included from C source files we compile,[m
+[1mdiff --git a/conf/lab.mk b/conf/lab.mk[m
+[1mindex c175f9c..f74edb8 100644[m
+[1m--- a/conf/lab.mk[m
+[1m+++ b/conf/lab.mk[m
+[36m@@ -1,2 +1,2 @@[m
+[31m-LAB=2[m
+[31m-PACKAGEDATE=Wed Sep 12 14:51:29 EDT 2018[m
+[32m+[m[32mLAB=3[m
+[32m+[m[32mPACKAGEDATE=Tue Sep 25 12:21:10 EDT 2018[m
+[1mdiff --git a/grade-lab3 b/grade-lab3[m
+[1mnew file mode 100755[m
+[1mindex 0000000..365ba56[m
+[1m--- /dev/null[m
+[1m+++ b/grade-lab3[m
+[36m@@ -0,0 +1,135 @@[m
+[32m+[m[32m#!/usr/bin/env python[m
+[32m+[m
+[32m+[m[32mfrom gradelib import *[m
+[32m+[m
+[32m+[m[32mr = Runner(save("jos.out"),[m
+[32m+[m[32m           stop_breakpoint("readline"))[m
+[32m+[m
+[32m+[m[32m@test(10)[m
+[32m+[m[32mdef test_divzero():[m
+[32m+[m[32m    r.user_test("divzero")[m
+[32m+[m[32m    r.match('Incoming TRAP frame at 0xefffff..',[m
+[32m+[m[32m            'TRAP frame at 0xf.......',[m
+[32m+[m[32m            '  trap 0x00000000 Divide error',[m
+[32m+[m[32m            '  eip  0x008.....',[m
+[32m+[m[32m            '  ss   0x----0023',[m
+[32m+[m[32m            '.00001000. free env 00001000',[m
+[32m+[m[32m            no=['1/0 is ........!'])[m
+[32m+[m
+[32m+[m[32m@test(10)[m
+[32m+[m[32mdef test_softint():[m
+[32m+[m[32m    r.user_test("softint")[m
+[32m+[m[32m    r.match('Welcome to the JOS kernel monitor!',[m
+[32m+[m[32m            'Incoming TRAP frame at 0xefffffbc',[m
+[32m+[m[32m            'TRAP frame at 0xf.......',[m
+[32m+[m[32m            '  trap 0x0000000d General Protection',[m
+[32m+[m[32m            '  eip  0x008.....',[m
+[32m+[m[32m            '  ss   0x----0023',[m
+[32m+[m[32m            '.00001000. free env 0000100')[m
+[32m+[m
+[32m+[m[32m@test(10)[m
+[32m+[m[32mdef test_badsegment():[m
+[32m+[m[32m    r.user_test("badsegment")[m
+[32m+[m[32m    r.match('Incoming TRAP frame at 0xefffffbc',[m
+[32m+[m[32m            'TRAP frame at 0xf.......',[m
+[32m+[m[32m            '  trap 0x0000000d General Protection',[m
+[32m+[m[32m            '  err  0x00000028',[m
+[32m+[m[32m            '  eip  0x008.....',[m
+[32m+[m[32m            '  ss   0x----0023',[m
+[32m+[m[32m            '.00001000. free env 0000100')[m
+[32m+[m
+[32m+[m[32mend_part("A")[m
+[32m+[m
+[32m+[m[32m@test(5)[m
+[32m+[m[32mdef test_faultread():[m
+[32m+[m[32m    r.user_test("faultread")[m
+[32m+[m[32m    r.match('.00001000. user fault va 00000000 ip 008.....',[m
+[32m+[m[32m            'Incoming TRAP frame at 0xefffffbc',[m
+[32m+[m[32m            'TRAP frame at 0xf.......',[m
+[32m+[m[32m            '  trap 0x0000000e Page Fault',[m
+[32m+[m[32m            '  err  0x00000004.*',[m
+[32m+[m[32m            '.00001000. free env 0000100',[m
+[32m+[m[32m            no=['I read ........ from location 0!'])[m
+[32m+[m
+[32m+[m[32m@test(5)[m
+[32m+[m[32mdef test_faultreadkernel():[m
+[32m+[m[32m    r.user_test("faultreadkernel")[m
+[32m+[m[32m    r.match('.00001000. user fault va f0100000 ip 008.....',[m
+[32m+[m[32m            'Incoming TRAP frame at 0xefffffbc',[m
+[32m+[m[32m            'TRAP frame at 0xf.......',[m
+[32m+[m[32m            '  trap 0x0000000e Page Fault',[m
+[32m+[m[32m            '  err  0x00000005.*',[m
+[32m+[m[32m            '.00001000. free env 00001000',[m
+[32m+[m[32m            no=['I read ........ from location 0xf0100000!'])[m
+[32m+[m
+[32m+[m[32m@test(5)[m
+[32m+[m[32mdef test_faultwrite():[m
+[32m+[m[32m    r.user_test("faultwrite")[m
+[32m+[m[32m    r.match('.00001000. user fault va 00000000 ip 008.....',[m
+[32m+[m[32m            'Incoming TRAP frame at 0xefffffbc',[m
+[32m+[m[32m            'TRAP frame at 0xf.......',[m
+[32m+[m[32m            '  trap 0x0000000e Page Fault',[m
+[32m+[m[32m            '  err  0x00000006.*',[m
+[32m+[m[32m            '.00001000. free env 0000100')[m
+[32m+[m
+[32m+[m[32m@test(5)[m
+[32m+[m[32mdef test_faultwritekernel():[m
+[32m+[m[32m    r.user_test("faultwritekernel")[m
+[32m+[m[32m    r.match('.00001000. user fault va f0100000 ip 008.....',[m
+[32m+[m[32m            'Incoming TRAP frame at 0xefffffbc',[m
+[32m+[m[32m            'TRAP frame at 0xf.......',[m
+[32m+[m[32m            '  trap 0x0000000e Page Fault',[m
+[32m+[m[32m            '  err  0x00000007.*',[m
+[32m+[m[32m            '.00001000. free env 0000100')[m
+[32m+[m
+[32m+[m[32m@test(5)[m
+[32m+[m[32mdef test_breakpoint():[m
+[32m+[m[32m    r.user_test("breakpoint")[m
+[32m+[m[32m    r.match('Welcome to the JOS kernel monitor!',[m
+[32m+[m[32m            'Incoming TRAP frame at 0xefffffbc',[m
+[32m+[m[32m            'TRAP frame at 0xf.......',[m
+[32m+[m[32m            '  trap 0x00000003 Breakpoint',[m
+[32m+[m[32m            '  eip  0x008.....',[m
+[32m+[m[32m            '  ss   0x----0023',[m
+[32m+[m[32m            no=['.00001000. free env 00001000'])[m
+[32m+[m
+[32m+[m[32m@test(5)[m
+[32m+[m[32mdef test_testbss():[m
+[32m+[m[32m    r.user_test("testbss")[m
+[32m+[m[32m    r.match('Making sure bss works right...',[m
+[32m+[m[32m            'Yes, good.  Now doing a wild write off the end...',[m
+[32m+[m[32m            '.00001000. user fault va 00c..... ip 008.....',[m
+[32m+[m[32m            '.00001000. free env 0000100')[m
+[32m+[m
+[32m+[m[32m@test(5)[m
+[32m+[m[32mdef test_hello():[m
+[32m+[m[32m    r.user_test("hello")[m
+[32m+[m[32m    r.match('.00000000. new env 00001000',[m
+[32m+[m[32m            'hello, world',[m
+[32m+[m[32m            'i am environment 00001000',[m
+[32m+[m[32m            '.00001000. exiting gracefully',[m
+[32m+[m[32m            '.00001000. free env 00001000',[m
+[32m+[m[32m            'Destroyed the only environment - nothing more to do!')[m
+[32m+[m
+[32m+[m[32m@test(5)[m
+[32m+[m[32mdef test_buggyhello():[m
+[32m+[m[32m    r.user_test("buggyhello")[m
+[32m+[m[32m    r.match('.00001000. user_mem_check assertion failure for va 00000001',[m
+[32m+[m[32m            '.00001000. free env 00001000')[m
+[32m+[m
+[32m+[m[32m@test(5)[m
+[32m+[m[32mdef test_buggyhello2():[m
+[32m+[m[32m    r.user_test("buggyhello2")[m
+[32m+[m[32m    r.match('.00001000. user_mem_check assertion failure for va 0....000',[m
+[32m+[m[32m            '.00001000. free env 00001000',[m
+[32m+[m[32m            no=['hello, world'])[m
+[32m+[m
+[32m+[m[32m@test(5)[m
+[32m+[m[32mdef test_evilhello():[m
+[32m+[m[32m    r.user_test("evilhello")[m
+[32m+[m[32m    r.match('.00001000. user_mem_check assertion failure for va f0100...',[m
+[32m+[m[32m            '.00001000. free env 00001000')[m
+[32m+[m
+[32m+[m[32mend_part("B")[m
+[32m+[m
+[32m+[m[32mrun_tests()[m
+[1mdiff --git a/inc/env.h b/inc/env.h[m
+[1mnew file mode 100644[m
+[1mindex 0000000..19b3de7[m
+[1m--- /dev/null[m
+[1m+++ b/inc/env.h[m
+[36m@@ -0,0 +1,59 @@[m
+[32m+[m[32m/* See COPYRIGHT for copyright information. */[m
+[32m+[m
+[32m+[m[32m#ifndef JOS_INC_ENV_H[m
+[32m+[m[32m#define JOS_INC_ENV_H[m
+[32m+[m
+[32m+[m[32m#include <inc/types.h>[m
+[32m+[m[32m#include <inc/trap.h>[m
+[32m+[m[32m#include <inc/memlayout.h>[m
+[32m+[m
+[32m+[m[32mtypedef int32_t envid_t;[m
+[32m+[m
+[32m+[m[32m// An environment ID 'envid_t' has three parts:[m
+[32m+[m[32m//[m
+[32m+[m[32m// +1+---------------21-----------------+--------10--------+[m
+[32m+[m[32m// |0|          Uniqueifier             |   Environment    |[m
+[32m+[m[32m// | |                                  |      Index       |[m
+[32m+[m[32m// +------------------------------------+------------------+[m
+[32m+[m[32m//                                       \--- ENVX(eid) --/[m
+[32m+[m[32m//[m
+[32m+[m[32m// The environment index ENVX(eid) equals the environment's index in the[m
+[32m+[m[32m// 'envs[]' array.  The uniqueifier distinguishes environments that were[m
+[32m+[m[32m// created at different times, but share the same environment index.[m
+[32m+[m[32m//[m
+[32m+[m[32m// All real environments are greater than 0 (so the sign bit is zero).[m
+[32m+[m[32m// envid_ts less than 0 signify errors.  The envid_t == 0 is special, and[m
+[32m+[m[32m// stands for the current environment.[m
+[32m+[m
+[32m+[m[32m#define LOG2NENV		10[m
+[32m+[m[32m#define NENV			(1 << LOG2NENV)[m
+[32m+[m[32m#define ENVX(envid)		((envid) & (NENV - 1))[m
+[32m+[m
+[32m+[m[32m// Values of env_status in struct Env[m
+[32m+[m[32menum {[m
+[32m+[m	[32mENV_FREE = 0,[m
+[32m+[m	[32mENV_DYING,[m
+[32m+[m	[32mENV_RUNNABLE,[m
+[32m+[m	[32mENV_RUNNING,[m
+[32m+[m	[32mENV_NOT_RUNNABLE[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32m// Special environment types[m
+[32m+[m[32menum EnvType {[m
+[32m+[m	[32mENV_TYPE_USER = 0,[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mstruct Env {[m
+[32m+[m	[32mstruct Trapframe env_tf;	// Saved registers[m
+[32m+[m	[32mstruct Env *env_link;		// Next free Env[m
+[32m+[m	[32menvid_t env_id;			// Unique environment identifier[m
+[32m+[m	[32menvid_t env_parent_id;		// env_id of this env's parent[m
+[32m+[m	[32menum EnvType env_type;		// Indicates special system environments[m
+[32m+[m	[32munsigned env_status;		// Status of the environment[m
+[32m+[m	[32muint32_t env_runs;		// Number of times environment has run[m
+[32m+[m
+[32m+[m	[32m// Address space[m
+[32m+[m	[32mpde_t *env_pgdir;		// Kernel virtual address of page dir[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32m#endif // !JOS_INC_ENV_H[m
+[1mdiff --git a/inc/lib.h b/inc/lib.h[m
+[1mnew file mode 100644[m
+[1mindex 0000000..611a57d[m
+[1m--- /dev/null[m
+[1m+++ b/inc/lib.h[m
+[36m@@ -0,0 +1,56 @@[m
+[32m+[m[32m// Main public header file for our user-land support library,[m
+[32m+[m[32m// whose code lives in the lib directory.[m
+[32m+[m[32m// This library is roughly our OS's version of a standard C library,[m
+[32m+[m[32m// and is intended to be linked into all user-mode applications[m
+[32m+[m[32m// (NOT the kernel or boot loader).[m
+[32m+[m
+[32m+[m[32m#ifndef JOS_INC_LIB_H[m
+[32m+[m[32m#define JOS_INC_LIB_H 1[m
+[32m+[m
+[32m+[m[32m#include <inc/types.h>[m
+[32m+[m[32m#include <inc/stdio.h>[m
+[32m+[m[32m#include <inc/stdarg.h>[m
+[32m+[m[32m#include <inc/string.h>[m
+[32m+[m[32m#include <inc/error.h>[m
+[32m+[m[32m#include <inc/assert.h>[m
+[32m+[m[32m#include <inc/env.h>[m
+[32m+[m[32m#include <inc/memlayout.h>[m
+[32m+[m[32m#include <inc/syscall.h>[m
+[32m+[m
+[32m+[m[32m#define USED(x)		(void)(x)[m
+[32m+[m
+[32m+[m[32m// main user program[m
+[32m+[m[32mvoid	umain(int argc, char **argv);[m
+[32m+[m
+[32m+[m[32m// libmain.c or entry.S[m
+[32m+[m[32mextern const char *binaryname;[m
+[32m+[m[32mextern const volatile struct Env *thisenv;[m
+[32m+[m[32mextern const volatile struct Env envs[NENV];[m
+[32m+[m[32mextern const volatile struct PageInfo pages[];[m
+[32m+[m
+[32m+[m[32m// exit.c[m
+[32m+[m[32mvoid	exit(void);[m
+[32m+[m
+[32m+[m[32m// readline.c[m
+[32m+[m[32mchar*	readline(const char *buf);[m
+[32m+[m
+[32m+[m[32m// syscall.c[m
+[32m+[m[32mvoid	sys_cputs(const char *string, size_t len);[m
+[32m+[m[32mint	sys_cgetc(void);[m
+[32m+[m[32menvid_t	sys_getenvid(void);[m
+[32m+[m[32mint	sys_env_destroy(envid_t);[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m[32m/* File open modes */[m
+[32m+[m[32m#define	O_RDONLY	0x0000		/* open for reading only */[m
+[32m+[m[32m#define	O_WRONLY	0x0001		/* open for writing only */[m
+[32m+[m[32m#define	O_RDWR		0x0002		/* open for reading and writing */[m
+[32m+[m[32m#define	O_ACCMODE	0x0003		/* mask for above modes */[m
+[32m+[m
+[32m+[m[32m#define	O_CREAT		0x0100		/* create if nonexistent */[m
+[32m+[m[32m#define	O_TRUNC		0x0200		/* truncate to zero length */[m
+[32m+[m[32m#define	O_EXCL		0x0400		/* error if already exists */[m
+[32m+[m[32m#define O_MKDIR		0x0800		/* create directory, not regular file */[m
+[32m+[m
+[32m+[m[32m#endif	// !JOS_INC_LIB_H[m
+[1mdiff --git a/inc/syscall.h b/inc/syscall.h[m
+[1mnew file mode 100644[m
+[1mindex 0000000..fd8df06[m
+[1m--- /dev/null[m
+[1m+++ b/inc/syscall.h[m
+[36m@@ -0,0 +1,13 @@[m
+[32m+[m[32m#ifndef JOS_INC_SYSCALL_H[m
+[32m+[m[32m#define JOS_INC_SYSCALL_H[m
+[32m+[m
+[32m+[m[32m/* system call numbers */[m
+[32m+[m[32menum {[m
+[32m+[m	[32mSYS_cputs = 0,[m
+[32m+[m	[32mSYS_cgetc,[m
+[32m+[m	[32mSYS_getenvid,[m
+[32m+[m	[32mSYS_env_destroy,[m
+[32m+[m	[32mNSYSCALLS[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32m#endif /* !JOS_INC_SYSCALL_H */[m
+[1mdiff --git a/inc/trap.h b/inc/trap.h[m
+[1mnew file mode 100644[m
+[1mindex 0000000..c3437af[m
+[1m--- /dev/null[m
+[1m+++ b/inc/trap.h[m
+[36m@@ -0,0 +1,80 @@[m
+[32m+[m[32m#ifndef JOS_INC_TRAP_H[m
+[32m+[m[32m#define JOS_INC_TRAP_H[m
+[32m+[m
+[32m+[m[32m// Trap numbers[m
+[32m+[m[32m// These are processor defined:[m
+[32m+[m[32m#define T_DIVIDE     0		// divide error[m
+[32m+[m[32m#define T_DEBUG      1		// debug exception[m
+[32m+[m[32m#define T_NMI        2		// non-maskable interrupt[m
+[32m+[m[32m#define T_BRKPT      3		// breakpoint[m
+[32m+[m[32m#define T_OFLOW      4		// overflow[m
+[32m+[m[32m#define T_BOUND      5		// bounds check[m
+[32m+[m[32m#define T_ILLOP      6		// illegal opcode[m
+[32m+[m[32m#define T_DEVICE     7		// device not available[m
+[32m+[m[32m#define T_DBLFLT     8		// double fault[m
+[32m+[m[32m/* #define T_COPROC  9 */	// reserved (not generated by recent processors)[m
+[32m+[m[32m#define T_TSS       10		// invalid task switch segment[m
+[32m+[m[32m#define T_SEGNP     11		// segment not present[m
+[32m+[m[32m#define T_STACK     12		// stack exception[m
+[32m+[m[32m#define T_GPFLT     13		// general protection fault[m
+[32m+[m[32m#define T_PGFLT     14		// page fault[m
+[32m+[m[32m/* #define T_RES    15 */	// reserved[m
+[32m+[m[32m#define T_FPERR     16		// floating point error[m
+[32m+[m[32m#define T_ALIGN     17		// aligment check[m
+[32m+[m[32m#define T_MCHK      18		// machine check[m
+[32m+[m[32m#define T_SIMDERR   19		// SIMD floating point error[m
+[32m+[m
+[32m+[m[32m// These are arbitrarily chosen, but with care not to overlap[m
+[32m+[m[32m// processor defined exceptions or interrupt vectors.[m
+[32m+[m[32m#define T_SYSCALL   48		// system call[m
+[32m+[m[32m#define T_DEFAULT   500		// catchall[m
+[32m+[m
+[32m+[m[32m#define IRQ_OFFSET	32	// IRQ 0 corresponds to int IRQ_OFFSET[m
+[32m+[m
+[32m+[m[32m// Hardware IRQ numbers. We receive these as (IRQ_OFFSET+IRQ_WHATEVER)[m
+[32m+[m[32m#define IRQ_TIMER        0[m
+[32m+[m[32m#define IRQ_KBD          1[m
+[32m+[m[32m#define IRQ_SERIAL       4[m
+[32m+[m[32m#define IRQ_SPURIOUS     7[m
+[32m+[m[32m#define IRQ_IDE         14[m
+[32m+[m[32m#define IRQ_ERROR       19[m
+[32m+[m
+[32m+[m[32m#ifndef __ASSEMBLER__[m
+[32m+[m
+[32m+[m[32m#include <inc/types.h>[m
+[32m+[m
+[32m+[m[32mstruct PushRegs {[m
+[32m+[m	[32m/* registers as pushed by pusha */[m
+[32m+[m	[32muint32_t reg_edi;[m
+[32m+[m	[32muint32_t reg_esi;[m
+[32m+[m	[32muint32_t reg_ebp;[m
+[32m+[m	[32muint32_t reg_oesp;		/* Useless */[m
+[32m+[m	[32muint32_t reg_ebx;[m
+[32m+[m	[32muint32_t reg_edx;[m
+[32m+[m	[32muint32_t reg_ecx;[m
+[32m+[m	[32muint32_t reg_eax;[m
+[32m+[m[32m} __attribute__((packed));[m
+[32m+[m
+[32m+[m[32mstruct Trapframe {[m
+[32m+[m	[32mstruct PushRegs tf_regs;[m
+[32m+[m	[32muint16_t tf_es;[m
+[32m+[m	[32muint16_t tf_padding1;[m
+[32m+[m	[32muint16_t tf_ds;[m
+[32m+[m	[32muint16_t tf_padding2;[m
+[32m+[m	[32muint32_t tf_trapno;[m
+[32m+[m	[32m/* below here defined by x86 hardware */[m
+[32m+[m	[32muint32_t tf_err;[m
+[32m+[m	[32muintptr_t tf_eip;[m
+[32m+[m	[32muint16_t tf_cs;[m
+[32m+[m	[32muint16_t tf_padding3;[m
+[32m+[m	[32muint32_t tf_eflags;[m
+[32m+[m	[32m/* below here only when crossing rings, such as from user to kernel */[m
+[32m+[m	[32muintptr_t tf_esp;[m
+[32m+[m	[32muint16_t tf_ss;[m
+[32m+[m	[32muint16_t tf_padding4;[m
+[32m+[m[32m} __attribute__((packed));[m
+[32m+[m
+[32m+[m
+[32m+[m[32m#endif /* !__ASSEMBLER__ */[m
+[32m+[m
+[32m+[m[32m#endif /* !JOS_INC_TRAP_H */[m
+[1mdiff --git a/kern/Makefrag b/kern/Makefrag[m
+[1mindex 3b2982e..b39cff2 100644[m
+[1m--- a/kern/Makefrag[m
+[1m+++ b/kern/Makefrag[m
+[36m@@ -36,7 +36,20 @@[m [mKERN_SRCFILES :=	kern/entry.S \[m
+ KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))[m
+ [m
+ # Binary program images to embed within the kernel.[m
+[31m-KERN_BINFILES := [m
+[32m+[m[32m# Binary files for LAB3[m
+[32m+[m[32mKERN_BINFILES :=	user/hello \[m
+[32m+[m			[32muser/buggyhello \[m
+[32m+[m			[32muser/buggyhello2 \[m
+[32m+[m			[32muser/evilhello \[m
+[32m+[m			[32muser/testbss \[m
+[32m+[m			[32muser/divzero \[m
+[32m+[m			[32muser/breakpoint \[m
+[32m+[m			[32muser/softint \[m
+[32m+[m			[32muser/badsegment \[m
+[32m+[m			[32muser/faultread \[m
+[32m+[m			[32muser/faultreadkernel \[m
+[32m+[m			[32muser/faultwrite \[m
+[32m+[m			[32muser/faultwritekernel[m
+ [m
+ KERN_OBJFILES := $(patsubst %.c, $(OBJDIR)/%.o, $(KERN_SRCFILES))[m
+ KERN_OBJFILES := $(patsubst %.S, $(OBJDIR)/%.o, $(KERN_OBJFILES))[m
+[1mdiff --git a/kern/entry.S b/kern/entry.S[m
+[1mindex 9550bbb..6ab9bad 100644[m
+[1m--- a/kern/entry.S[m
+[1m+++ b/kern/entry.S[m
+[36m@@ -2,6 +2,7 @@[m
+ [m
+ #include <inc/mmu.h>[m
+ #include <inc/memlayout.h>[m
+[32m+[m[32m#include <inc/trap.h>[m
+ [m
+ # Shift Right Logical [m
+ #define SRL(val, shamt)		(((val) >> (shamt)) & ~(-1 << (32 - (shamt))))[m
+[1mdiff --git a/kern/env.c b/kern/env.c[m
+[1mnew file mode 100644[m
+[1mindex 0000000..db2fda9[m
+[1m--- /dev/null[m
+[1m+++ b/kern/env.c[m
+[36m@@ -0,0 +1,463 @@[m
+[32m+[m[32m/* See COPYRIGHT for copyright information. */[m
+[32m+[m
+[32m+[m[32m#include <inc/x86.h>[m
+[32m+[m[32m#include <inc/mmu.h>[m
+[32m+[m[32m#include <inc/error.h>[m
+[32m+[m[32m#include <inc/string.h>[m
+[32m+[m[32m#include <inc/assert.h>[m
+[32m+[m[32m#include <inc/elf.h>[m
+[32m+[m
+[32m+[m[32m#include <kern/env.h>[m
+[32m+[m[32m#include <kern/pmap.h>[m
+[32m+[m[32m#include <kern/trap.h>[m
+[32m+[m[32m#include <kern/monitor.h>[m
+[32m+[m
+[32m+[m[32mstruct Env *envs = NULL;		// All environments[m
+[32m+[m[32mstruct Env *curenv = NULL;		// The current env[m
+[32m+[m[32mstatic struct Env *env_free_list;	// Free environment list[m
+[32m+[m					[32m// (linked by Env->env_link)[m
+[32m+[m
+[32m+[m[32m#define ENVGENSHIFT	12		// >= LOGNENV[m
+[32m+[m
+[32m+[m[32m// Global descriptor table.[m
+[32m+[m[32m//[m
+[32m+[m[32m// Set up global descriptor table (GDT) with separate segments for[m
+[32m+[m[32m// kernel mode and user mode.  Segments serve many purposes on the x86.[m
+[32m+[m[32m// We don't use any of their memory-mapping capabilities, but we need[m
+[32m+[m[32m// them to switch privilege levels.[m[41m [m
+[32m+[m[32m//[m
+[32m+[m[32m// The kernel and user segments are identical except for the DPL.[m
+[32m+[m[32m// To load the SS register, the CPL must equal the DPL.  Thus,[m
+[32m+[m[32m// we must duplicate the segments for the user and the kernel.[m
+[32m+[m[32m//[m
+[32m+[m[32m// In particular, the last argument to the SEG macro used in the[m
+[32m+[m[32m// definition of gdt specifies the Descriptor Privilege Level (DPL)[m
+[32m+[m[32m// of that descriptor: 0 for kernel and 3 for user.[m
+[32m+[m[32m//[m
+[32m+[m[32mstruct Segdesc gdt[] =[m
+[32m+[m[32m{[m
+[32m+[m	[32m// 0x0 - unused (always faults -- for trapping NULL far pointers)[m
+[32m+[m	[32mSEG_NULL,[m
+[32m+[m
+[32m+[m	[32m// 0x8 - kernel code segment[m
+[32m+[m	[32m[GD_KT >> 3] = SEG(STA_X | STA_R, 0x0, 0xffffffff, 0),[m
+[32m+[m
+[32m+[m	[32m// 0x10 - kernel data segment[m
+[32m+[m	[32m[GD_KD >> 3] = SEG(STA_W, 0x0, 0xffffffff, 0),[m
+[32m+[m
+[32m+[m	[32m// 0x18 - user code segment[m
+[32m+[m	[32m[GD_UT >> 3] = SEG(STA_X | STA_R, 0x0, 0xffffffff, 3),[m
+[32m+[m
+[32m+[m	[32m// 0x20 - user data segment[m
+[32m+[m	[32m[GD_UD >> 3] = SEG(STA_W, 0x0, 0xffffffff, 3),[m
+[32m+[m
+[32m+[m	[32m// 0x28 - tss, initialized in trap_init_percpu()[m
+[32m+[m	[32m[GD_TSS0 >> 3] = SEG_NULL[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mstruct Pseudodesc gdt_pd = {[m
+[32m+[m	[32msizeof(gdt) - 1, (unsigned long) gdt[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32m//[m
+[32m+[m[32m// Converts an envid to an env pointer.[m
+[32m+[m[32m// If checkperm is set, the specified environment must be either the[m
+[32m+[m[32m// current environment or an immediate child of the current environment.[m
+[32m+[m[32m//[m
+[32m+[m[32m// RETURNS[m
+[32m+[m[32m//   0 on success, -E_BAD_ENV on error.[m
+[32m+[m[32m//   On success, sets *env_store to the environment.[m
+[32m+[m[32m//   On error, sets *env_store to NULL.[m
+[32m+[m[32m//[m
+[32m+[m[32mint[m
+[32m+[m[32menvid2env(envid_t envid, struct Env **env_store, bool checkperm)[m
+[32m+[m[32m{[m
+[32m+[m	[32mstruct Env *e;[m
+[32m+[m
+[32m+[m	[32m// If envid is zero, return the current environment.[m
+[32m+[m	[32mif (envid == 0) {[m
+[32m+[m		[32m*env_store = curenv;[m
+[32m+[m		[32mreturn 0;[m
+[32m+[m	[32m}[m
+[32m+[m
+[32m+[m	[32m// Look up the Env structure via the index part of the envid,[m
+[32m+[m	[32m// then check the env_id field in that struct Env[m
+[32m+[m	[32m// to ensure that the envid is not stale[m
+[32m+[m	[32m// (i.e., does not refer to a _previous_ environment[m
+[32m+[m	[32m// that used the same slot in the envs[] array).[m
+[32m+[m	[32me = &envs[ENVX(envid)];[m
+[32m+[m	[32mif (e->env_status == ENV_FREE || e->env_id != envid) {[m
+[32m+[m		[32m*env_store = 0;[m
+[32m+[m		[32mreturn -E_BAD_ENV;[m
+[32m+[m	[32m}[m
+[32m+[m
+[32m+[m	[32m// Check that the calling environment has legitimate permission[m
+[32m+[m	[32m// to manipulate the specified environment.[m
+[32m+[m	[32m// If checkperm is set, the specified environment[m
+[32m+[m	[32m// must be either the current environment[m
+[32m+[m	[32m// or an immediate child of the current environment.[m
+[32m+[m	[32mif (checkperm && e != curenv && e->env_parent_id != curenv->env_id) {[m
+[32m+[m		[32m*env_store = 0;[m
+[32m+[m		[32mreturn -E_BAD_ENV;[m
+[32m+[m	[32m}[m
+[32m+[m
+[32m+[m	[32m*env_store = e;[m
+[32m+[m	[32mreturn 0;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// Mark all environments in 'envs' as free, set their env_ids to 0,[m
+[32m+[m[32m// and insert them into the env_free_list.[m
+[32m+[m[32m// Make sure the environments are in the free list in the same order[m
+[32m+[m[32m// they are in the envs array (i.e., so that the first call to[m
+[32m+[m[32m// env_alloc() returns envs[0]).[m
+[32m+[m[32m//[m
+[32m+[m[32mvoid[m
+[32m+[m[32menv_init(void)[m
+[32m+[m[32m{[m
+[32m+[m	[32m// Set up envs array[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m	[32m// Per-CPU part of the initialization[m
+[32m+[m	[32menv_init_percpu();[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// Load GDT and segment descriptors.[m
+[32m+[m[32mvoid[m
+[32m+[m[32menv_init_percpu(void)[m
+[32m+[m[32m{[m
+[32m+[m	[32mlgdt(&gdt_pd);[m
+[32m+[m	[32m// The kernel never uses GS or FS, so we leave those set to[m
+[32m+[m	[32m// the user data segment.[m
+[32m+[m	[32masm volatile("movw %%ax,%%gs" : : "a" (GD_UD|3));[m
+[32m+[m	[32masm volatile("movw %%ax,%%fs" : : "a" (GD_UD|3));[m
+[32m+[m	[32m// The kernel does use ES, DS, and SS.  We'll change between[m
+[32m+[m	[32m// the kernel and user data segments as needed.[m
+[32m+[m	[32masm volatile("movw %%ax,%%es" : : "a" (GD_KD));[m
+[32m+[m	[32masm volatile("movw %%ax,%%ds" : : "a" (GD_KD));[m
+[32m+[m	[32masm volatile("movw %%ax,%%ss" : : "a" (GD_KD));[m
+[32m+[m	[32m// Load the kernel text segment into CS.[m
+[32m+[m	[32masm volatile("ljmp %0,$1f\n 1:\n" : : "i" (GD_KT));[m
+[32m+[m	[32m// For good measure, clear the local descriptor table (LDT),[m
+[32m+[m	[32m// since we don't use it.[m
+[32m+[m	[32mlldt(0);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m//[m
+[32m+[m[32m// Initialize the kernel virtual memory layout for environment e.[m
+[32m+[m[32m// Allocate a page directory, set e->env_pgdir accordingly,[m
+[32m+[m[32m// and initialize the kernel portion of the new environment's address space.[m
+[32m+[m[32m// Do NOT (yet) map anything into the user portion[m
+[32m+[m[32m// of the environment's virtual address space.[m
+[32m+[m[32m//[m
+[32m+[m[32m// Returns 0 on success, < 0 on error.  Errors include:[m
+[32m+[m[32m//	-E_NO_MEM if page directory or table could not be allocated.[m
+[32m+[m[32m//[m
+[32m+[m[32mstatic int[m
+[32m+[m[32menv_setup_vm(struct Env *e)[m
+[32m+[m[32m{[m
+[32m+[m	[32mint i;[m
+[32m+[m	[32mstruct PageInfo *p = NULL;[m
+[32m+[m
+[32m+[m	[32m// Allocate a page for the page directory[m
+[32m+[m	[32mif (!(p = page_alloc(ALLOC_ZERO)))[m
+[32m+[m		[32mreturn -E_NO_MEM;[m
+[32m+[m
+[32m+[m	[32m// Now, set e->env_pgdir and initialize the page directory.[m
+[32m+[m	[32m//[m
+[32m+[m	[32m// Hint:[m
+[32m+[m	[32m//    - The VA space of all envs is identical above UTOP[m
+[32m+[m	[32m//	(except at UVPT, which we've set below).[m
+[32m+[m	[32m//	See inc/memlayout.h for permissions and layout.[m
+[32m+[m	[32m//	Can you use kern_pgdir as a template?  Hint: Yes.[m
+[32m+[m	[32m//	(Make sure you got the permissions right in Lab 2.)[m
+[32m+[m	[32m//    - The initial VA below UTOP is empty.[m
+[32m+[m	[32m//    - You do not need to make any more calls to page_alloc.[m
+[32m+[m	[32m//    - Note: In general, pp_ref is not maintained for[m
+[32m+[m	[32m//	physical pages mapped only above UTOP, but env_pgdir[m
+[32m+[m	[32m//	is an exception -- you need to increment env_pgdir's[m
+[32m+[m	[32m//	pp_ref for env_free to work correctly.[m
+[32m+[m	[32m//    - The functions in kern/pmap.h are handy.[m
+[32m+[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m	[32m// UVPT maps the env's own page table read-only.[m
+[32m+[m	[32m// Permissions: kernel R, user R[m
+[32m+[m	[32me->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;[m
+[32m+[m
+[32m+[m	[32mreturn 0;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m//[m
+[32m+[m[32m// Allocates and initializes a new environment.[m
+[32m+[m[32m// On success, the new environment is stored in *newenv_store.[m
+[32m+[m[32m//[m
+[32m+[m[32m// Returns 0 on success, < 0 on failure.  Errors include:[m
+[32m+[m[32m//	-E_NO_FREE_ENV if all NENV environments are allocated[m
+[32m+[m[32m//	-E_NO_MEM on memory exhaustion[m
+[32m+[m[32m//[m
+[32m+[m[32mint[m
+[32m+[m[32menv_alloc(struct Env **newenv_store, envid_t parent_id)[m
+[32m+[m[32m{[m
+[32m+[m	[32mint32_t generation;[m
+[32m+[m	[32mint r;[m
+[32m+[m	[32mstruct Env *e;[m
+[32m+[m
+[32m+[m	[32mif (!(e = env_free_list))[m
+[32m+[m		[32mreturn -E_NO_FREE_ENV;[m
+[32m+[m
+[32m+[m	[32m// Allocate and set up the page directory for this environment.[m
+[32m+[m	[32mif ((r = env_setup_vm(e)) < 0)[m
+[32m+[m		[32mreturn r;[m
+[32m+[m
+[32m+[m	[32m// Generate an env_id for this environment.[m
+[32m+[m	[32mgeneration = (e->env_id + (1 << ENVGENSHIFT)) & ~(NENV - 1);[m
+[32m+[m	[32mif (generation <= 0)	// Don't create a negative env_id.[m
+[32m+[m		[32mgeneration = 1 << ENVGENSHIFT;[m
+[32m+[m	[32me->env_id = generation | (e - envs);[m
+[32m+[m
+[32m+[m	[32m// Set the basic status variables.[m
+[32m+[m	[32me->env_parent_id = parent_id;[m
+[32m+[m	[32me->env_type = ENV_TYPE_USER;[m
+[32m+[m	[32me->env_status = ENV_RUNNABLE;[m
+[32m+[m	[32me->env_runs = 0;[m
+[32m+[m
+[32m+[m	[32m// Clear out all the saved register state,[m
+[32m+[m	[32m// to prevent the register values[m
+[32m+[m	[32m// of a prior environment inhabiting this Env structure[m
+[32m+[m	[32m// from "leaking" into our new environment.[m
+[32m+[m	[32mmemset(&e->env_tf, 0, sizeof(e->env_tf));[m
+[32m+[m
+[32m+[m	[32m// Set up appropriate initial values for the segment registers.[m
+[32m+[m	[32m// GD_UD is the user data segment selector in the GDT, and[m
+[32m+[m	[32m// GD_UT is the user text segment selector (see inc/memlayout.h).[m
+[32m+[m	[32m// The low 2 bits of each segment register contains the[m
+[32m+[m	[32m// Requestor Privilege Level (RPL); 3 means user mode.  When[m
+[32m+[m	[32m// we switch privilege levels, the hardware does various[m
+[32m+[m	[32m// checks involving the RPL and the Descriptor Privilege Level[m
+[32m+[m	[32m// (DPL) stored in the descriptors themselves.[m
+[32m+[m	[32me->env_tf.tf_ds = GD_UD | 3;[m
+[32m+[m	[32me->env_tf.tf_es = GD_UD | 3;[m
+[32m+[m	[32me->env_tf.tf_ss = GD_UD | 3;[m
+[32m+[m	[32me->env_tf.tf_esp = USTACKTOP;[m
+[32m+[m	[32me->env_tf.tf_cs = GD_UT | 3;[m
+[32m+[m	[32m// You will set e->env_tf.tf_eip later.[m
+[32m+[m
+[32m+[m	[32m// commit the allocation[m
+[32m+[m	[32menv_free_list = e->env_link;[m
+[32m+[m	[32m*newenv_store = e;[m
+[32m+[m
+[32m+[m	[32mcprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);[m
+[32m+[m	[32mreturn 0;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m//[m
+[32m+[m[32m// Allocate len bytes of physical memory for environment env,[m
+[32m+[m[32m// and map it at virtual address va in the environment's address space.[m
+[32m+[m[32m// Does not zero or otherwise initialize the mapped pages in any way.[m
+[32m+[m[32m// Pages should be writable by user and kernel.[m
+[32m+[m[32m// Panic if any allocation attempt fails.[m
+[32m+[m[32m//[m
+[32m+[m[32mstatic void[m
+[32m+[m[32mregion_alloc(struct Env *e, void *va, size_t len)[m
+[32m+[m[32m{[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m	[32m// (But only if you need it for load_icode.)[m
+[32m+[m	[32m//[m
+[32m+[m	[32m// Hint: It is easier to use region_alloc if the caller can pass[m
+[32m+[m	[32m//   'va' and 'len' values that are not page-aligned.[m
+[32m+[m	[32m//   You should round va down, and round (va + len) up.[m
+[32m+[m	[32m//   (Watch out for corner-cases!)[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m//[m
+[32m+[m[32m// Set up the initial program binary, stack, and processor flags[m
+[32m+[m[32m// for a user process.[m
+[32m+[m[32m// This function is ONLY called during kernel initialization,[m
+[32m+[m[32m// before running the first user-mode environment.[m
+[32m+[m[32m//[m
+[32m+[m[32m// This function loads all loadable segments from the ELF binary image[m
+[32m+[m[32m// into the environment's user memory, starting at the appropriate[m
+[32m+[m[32m// virtual addresses indicated in the ELF program header.[m
+[32m+[m[32m// At the same time it clears to zero any portions of these segments[m
+[32m+[m[32m// that are marked in the program header as being mapped[m
+[32m+[m[32m// but not actually present in the ELF file - i.e., the program's bss section.[m
+[32m+[m[32m//[m
+[32m+[m[32m// All this is very similar to what our boot loader does, except the boot[m
+[32m+[m[32m// loader also needs to read the code from disk.  Take a look at[m
+[32m+[m[32m// boot/main.c to get ideas.[m
+[32m+[m[32m//[m
+[32m+[m[32m// Finally, this function maps one page for the program's initial stack.[m
+[32m+[m[32m//[m
+[32m+[m[32m// load_icode panics if it encounters problems.[m
+[32m+[m[32m//  - How might load_icode fail?  What might be wrong with the given input?[m
+[32m+[m[32m//[m
+[32m+[m[32mstatic void[m
+[32m+[m[32mload_icode(struct Env *e, uint8_t *binary)[m
+[32m+[m[32m{[m
+[32m+[m	[32m// Hints:[m
+[32m+[m	[32m//  Load each program segment into virtual memory[m
+[32m+[m	[32m//  at the address specified in the ELF segment header.[m
+[32m+[m	[32m//  You should only load segments with ph->p_type == ELF_PROG_LOAD.[m
+[32m+[m	[32m//  Each segment's virtual address can be found in ph->p_va[m
+[32m+[m	[32m//  and its size in memory can be found in ph->p_memsz.[m
+[32m+[m	[32m//  The ph->p_filesz bytes from the ELF binary, starting at[m
+[32m+[m	[32m//  'binary + ph->p_offset', should be copied to virtual address[m
+[32m+[m	[32m//  ph->p_va.  Any remaining memory bytes should be cleared to zero.[m
+[32m+[m	[32m//  (The ELF header should have ph->p_filesz <= ph->p_memsz.)[m
+[32m+[m	[32m//  Use functions from the previous lab to allocate and map pages.[m
+[32m+[m	[32m//[m
+[32m+[m	[32m//  All page protection bits should be user read/write for now.[m
+[32m+[m	[32m//  ELF segments are not necessarily page-aligned, but you can[m
+[32m+[m	[32m//  assume for this function that no two segments will touch[m
+[32m+[m	[32m//  the same virtual page.[m
+[32m+[m	[32m//[m
+[32m+[m	[32m//  You may find a function like region_alloc useful.[m
+[32m+[m	[32m//[m
+[32m+[m	[32m//  Loading the segments is much simpler if you can move data[m
+[32m+[m	[32m//  directly into the virtual addresses stored in the ELF binary.[m
+[32m+[m	[32m//  So which page directory should be in force during[m
+[32m+[m	[32m//  this function?[m
+[32m+[m	[32m//[m
+[32m+[m	[32m//  You must also do something with the program's entry point,[m
+[32m+[m	[32m//  to make sure that the environment starts executing there.[m
+[32m+[m	[32m//  What?  (See env_run() and env_pop_tf() below.)[m
+[32m+[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m	[32m// Now map one page for the program's initial stack[m
+[32m+[m	[32m// at virtual address USTACKTOP - PGSIZE.[m
+[32m+[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m//[m
+[32m+[m[32m// Allocates a new env with env_alloc, loads the named elf[m
+[32m+[m[32m// binary into it with load_icode, and sets its env_type.[m
+[32m+[m[32m// This function is ONLY called during kernel initialization,[m
+[32m+[m[32m// before running the first user-mode environment.[m
+[32m+[m[32m// The new env's parent ID is set to 0.[m
+[32m+[m[32m//[m
+[32m+[m[32mvoid[m
+[32m+[m[32menv_create(uint8_t *binary, enum EnvType type)[m
+[32m+[m[32m{[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m//[m
+[32m+[m[32m// Frees env e and all memory it uses.[m
+[32m+[m[32m//[m
+[32m+[m[32mvoid[m
+[32m+[m[32menv_free(struct Env *e)[m
+[32m+[m[32m{[m
+[32m+[m	[32mpte_t *pt;[m
+[32m+[m	[32muint32_t pdeno, pteno;[m
+[32m+[m	[32mphysaddr_t pa;[m
+[32m+[m
+[32m+[m	[32m// If freeing the current environment, switch to kern_pgdir[m
+[32m+[m	[32m// before freeing the page directory, just in case the page[m
+[32m+[m	[32m// gets reused.[m
+[32m+[m	[32mif (e == curenv)[m
+[32m+[m		[32mlcr3(PADDR(kern_pgdir));[m
+[32m+[m
+[32m+[m	[32m// Note the environment's demise.[m
+[32m+[m	[32mcprintf("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, e->env_id);[m
+[32m+[m
+[32m+[m	[32m// Flush all mapped pages in the user portion of the address space[m
+[32m+[m	[32mstatic_assert(UTOP % PTSIZE == 0);[m
+[32m+[m	[32mfor (pdeno = 0; pdeno < PDX(UTOP); pdeno++) {[m
+[32m+[m
+[32m+[m		[32m// only look at mapped page tables[m
+[32m+[m		[32mif (!(e->env_pgdir[pdeno] & PTE_P))[m
+[32m+[m			[32mcontinue;[m
+[32m+[m
+[32m+[m		[32m// find the pa and va of the page table[m
+[32m+[m		[32mpa = PTE_ADDR(e->env_pgdir[pdeno]);[m
+[32m+[m		[32mpt = (pte_t*) KADDR(pa);[m
+[32m+[m
+[32m+[m		[32m// unmap all PTEs in this page table[m
+[32m+[m		[32mfor (pteno = 0; pteno <= PTX(~0); pteno++) {[m
+[32m+[m			[32mif (pt[pteno] & PTE_P)[m
+[32m+[m				[32mpage_remove(e->env_pgdir, PGADDR(pdeno, pteno, 0));[m
+[32m+[m		[32m}[m
+[32m+[m
+[32m+[m		[32m// free the page table itself[m
+[32m+[m		[32me->env_pgdir[pdeno] = 0;[m
+[32m+[m		[32mpage_decref(pa2page(pa));[m
+[32m+[m	[32m}[m
+[32m+[m
+[32m+[m	[32m// free the page directory[m
+[32m+[m	[32mpa = PADDR(e->env_pgdir);[m
+[32m+[m	[32me->env_pgdir = 0;[m
+[32m+[m	[32mpage_decref(pa2page(pa));[m
+[32m+[m
+[32m+[m	[32m// return the environment to the free list[m
+[32m+[m	[32me->env_status = ENV_FREE;[m
+[32m+[m	[32me->env_link = env_free_list;[m
+[32m+[m	[32menv_free_list = e;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m//[m
+[32m+[m[32m// Frees environment e.[m
+[32m+[m[32m//[m
+[32m+[m[32mvoid[m
+[32m+[m[32menv_destroy(struct Env *e)[m
+[32m+[m[32m{[m
+[32m+[m	[32menv_free(e);[m
+[32m+[m
+[32m+[m	[32mcprintf("Destroyed the only environment - nothing more to do!\n");[m
+[32m+[m	[32mwhile (1)[m
+[32m+[m		[32mmonitor(NULL);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m
+[32m+[m[32m//[m
+[32m+[m[32m// Restores the register values in the Trapframe with the 'iret' instruction.[m
+[32m+[m[32m// This exits the kernel and starts executing some environment's code.[m
+[32m+[m[32m//[m
+[32m+[m[32m// This function does not return.[m
+[32m+[m[32m//[m
+[32m+[m[32mvoid[m
+[32m+[m[32menv_pop_tf(struct Trapframe *tf)[m
+[32m+[m[32m{[m
+[32m+[m	[32masm volatile([m
+[32m+[m		[32m"\tmovl %0,%%esp\n"[m
+[32m+[m		[32m"\tpopal\n"[m
+[32m+[m		[32m"\tpopl %%es\n"[m
+[32m+[m		[32m"\tpopl %%ds\n"[m
+[32m+[m		[32m"\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */[m
+[32m+[m		[32m"\tiret\n"[m
+[32m+[m		[32m: : "g" (tf) : "memory");[m
+[32m+[m	[32mpanic("iret failed");  /* mostly to placate the compiler */[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m//[m
+[32m+[m[32m// Context switch from curenv to env e.[m
+[32m+[m[32m// Note: if this is the first call to env_run, curenv is NULL.[m
+[32m+[m[32m//[m
+[32m+[m[32m// This function does not return.[m
+[32m+[m[32m//[m
+[32m+[m[32mvoid[m
+[32m+[m[32menv_run(struct Env *e)[m
+[32m+[m[32m{[m
+[32m+[m	[32m// Step 1: If this is a context switch (a new environment is running):[m
+[32m+[m	[32m//	   1. Set the current environment (if any) back to[m
+[32m+[m	[32m//	      ENV_RUNNABLE if it is ENV_RUNNING (think about[m
+[32m+[m	[32m//	      what other states it can be in),[m
+[32m+[m	[32m//	   2. Set 'curenv' to the new environment,[m
+[32m+[m	[32m//	   3. Set its status to ENV_RUNNING,[m
+[32m+[m	[32m//	   4. Update its 'env_runs' counter,[m
+[32m+[m	[32m//	   5. Use lcr3() to switch to its address space.[m
+[32m+[m	[32m// Step 2: Use env_pop_tf() to restore the environment's[m
+[32m+[m	[32m//	   registers and drop into user mode in the[m
+[32m+[m	[32m//	   environment.[m
+[32m+[m
+[32m+[m	[32m// Hint: This function loads the new environment's state from[m
+[32m+[m	[32m//	e->env_tf.  Go back through the code you wrote above[m
+[32m+[m	[32m//	and make sure you have set the relevant parts of[m
+[32m+[m	[32m//	e->env_tf to sensible values.[m
+[32m+[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m	[32mpanic("env_run not yet implemented");[m
+[32m+[m[32m}[m
+[32m+[m
+[1mdiff --git a/kern/env.h b/kern/env.h[m
+[1mnew file mode 100644[m
+[1mindex 0000000..9c574c1[m
+[1m--- /dev/null[m
+[1m+++ b/kern/env.h[m
+[36m@@ -0,0 +1,35 @@[m
+[32m+[m[32m/* See COPYRIGHT for copyright information. */[m
+[32m+[m
+[32m+[m[32m#ifndef JOS_KERN_ENV_H[m
+[32m+[m[32m#define JOS_KERN_ENV_H[m
+[32m+[m
+[32m+[m[32m#include <inc/env.h>[m
+[32m+[m
+[32m+[m[32mextern struct Env *envs;		// All environments[m
+[32m+[m[32mextern struct Env *curenv;		// Current environment[m
+[32m+[m[32mextern struct Segdesc gdt[];[m
+[32m+[m
+[32m+[m[32mvoid	env_init(void);[m
+[32m+[m[32mvoid	env_init_percpu(void);[m
+[32m+[m[32mint	env_alloc(struct Env **e, envid_t parent_id);[m
+[32m+[m[32mvoid	env_free(struct Env *e);[m
+[32m+[m[32mvoid	env_create(uint8_t *binary, enum EnvType type);[m
+[32m+[m[32mvoid	env_destroy(struct Env *e);	// Does not return if e == curenv[m
+[32m+[m
+[32m+[m[32mint	envid2env(envid_t envid, struct Env **env_store, bool checkperm);[m
+[32m+[m[32m// The following two functions do not return[m
+[32m+[m[32mvoid	env_run(struct Env *e) __attribute__((noreturn));[m
+[32m+[m[32mvoid	env_pop_tf(struct Trapframe *tf) __attribute__((noreturn));[m
+[32m+[m
+[32m+[m[32m// Without this extra macro, we couldn't pass macros like TEST to[m
+[32m+[m[32m// ENV_CREATE because of the C pre-processor's argument prescan rule.[m
+[32m+[m[32m#define ENV_PASTE3(x, y, z) x ## y ## z[m
+[32m+[m
+[32m+[m[32m#define ENV_CREATE(x, type)						\[m
+[32m+[m	[32mdo {								\[m
+[32m+[m		[32mextern uint8_t ENV_PASTE3(_binary_obj_, x, _start)[];	\[m
+[32m+[m		[32menv_create(ENV_PASTE3(_binary_obj_, x, _start),		\[m
+[32m+[m			[32m   type);					\[m
+[32m+[m	[32m} while (0)[m
+[32m+[m
+[32m+[m[32m#endif // !JOS_KERN_ENV_H[m
+[1mdiff --git a/kern/init.c b/kern/init.c[m
+[1mindex 1fb9152..3d4122c 100644[m
+[1m--- a/kern/init.c[m
+[1m+++ b/kern/init.c[m
+[36m@@ -8,6 +8,8 @@[m
+ #include <kern/console.h>[m
+ #include <kern/pmap.h>[m
+ #include <kern/kclock.h>[m
+[32m+[m[32m#include <kern/env.h>[m
+[32m+[m[32m#include <kern/trap.h>[m
+ [m
+ [m
+ void[m
+[36m@@ -29,9 +31,20 @@[m [mi386_init(void)[m
+ 	// Lab 2 memory management initialization functions[m
+ 	mem_init();[m
+ [m
+[31m-	// Drop into the kernel monitor.[m
+[31m-	while (1)[m
+[31m-		monitor(NULL);[m
+[32m+[m	[32m// Lab 3 user environment initialization functions[m
+[32m+[m	[32menv_init();[m
+[32m+[m	[32mtrap_init();[m
+[32m+[m
+[32m+[m[32m#if defined(TEST)[m
+[32m+[m	[32m// Don't touch -- used by grading script![m
+[32m+[m	[32mENV_CREATE(TEST, ENV_TYPE_USER);[m
+[32m+[m[32m#else[m
+[32m+[m	[32m// Touch all you want.[m
+[32m+[m	[32mENV_CREATE(user_hello, ENV_TYPE_USER);[m
+[32m+[m[32m#endif // TEST*[m
+[32m+[m
+[32m+[m	[32m// We only have one user environment for now, so just run it.[m
+[32m+[m	[32menv_run(&envs[0]);[m
+ }[m
+ [m
+ [m
+[1mdiff --git a/kern/kdebug.c b/kern/kdebug.c[m
+[1mindex 0f91021..39e1ce5 100644[m
+[1m--- a/kern/kdebug.c[m
+[1m+++ b/kern/kdebug.c[m
+[36m@@ -4,12 +4,21 @@[m
+ #include <inc/assert.h>[m
+ [m
+ #include <kern/kdebug.h>[m
+[32m+[m[32m#include <kern/pmap.h>[m
+[32m+[m[32m#include <kern/env.h>[m
+ [m
+ extern const struct Stab __STAB_BEGIN__[];	// Beginning of stabs table[m
+ extern const struct Stab __STAB_END__[];	// End of stabs table[m
+ extern const char __STABSTR_BEGIN__[];		// Beginning of string table[m
+ extern const char __STABSTR_END__[];		// End of string table[m
+ [m
+[32m+[m[32mstruct UserStabData {[m
+[32m+[m	[32mconst struct Stab *stabs;[m
+[32m+[m	[32mconst struct Stab *stab_end;[m
+[32m+[m	[32mconst char *stabstr;[m
+[32m+[m	[32mconst char *stabstr_end;[m
+[32m+[m[32m};[m
+[32m+[m
+ [m
+ // stab_binsearch(stabs, region_left, region_right, type, addr)[m
+ //[m
+[36m@@ -123,8 +132,24 @@[m [mdebuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)[m
+ 		stabstr = __STABSTR_BEGIN__;[m
+ 		stabstr_end = __STABSTR_END__;[m
+ 	} else {[m
+[31m-		// Can't search for user-level addresses yet![m
+[31m-  	        panic("User address");[m
+[32m+[m		[32m// The user-application linker script, user/user.ld,[m
+[32m+[m		[32m// puts information about the application's stabs (equivalent[m
+[32m+[m		[32m// to __STAB_BEGIN__, __STAB_END__, __STABSTR_BEGIN__, and[m
+[32m+[m		[32m// __STABSTR_END__) in a structure located at virtual address[m
+[32m+[m		[32m// USTABDATA.[m
+[32m+[m		[32mconst struct UserStabData *usd = (const struct UserStabData *) USTABDATA;[m
+[32m+[m
+[32m+[m		[32m// Make sure this memory is valid.[m
+[32m+[m		[32m// Return -1 if it is not.  Hint: Call user_mem_check.[m
+[32m+[m		[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m		[32mstabs = usd->stabs;[m
+[32m+[m		[32mstab_end = usd->stab_end;[m
+[32m+[m		[32mstabstr = usd->stabstr;[m
+[32m+[m		[32mstabstr_end = usd->stabstr_end;[m
+[32m+[m
+[32m+[m		[32m// Make sure the STABS and string table memory is valid.[m
+[32m+[m		[32m// LAB 3: Your code here.[m
+ 	}[m
+ [m
+ 	// String table validity checks[m
+[1mdiff --git a/kern/monitor.c b/kern/monitor.c[m
+[1mindex c55d7ad..65d8e99 100644[m
+[1m--- a/kern/monitor.c[m
+[1m+++ b/kern/monitor.c[m
+[36m@@ -10,6 +10,7 @@[m
+ #include <kern/console.h>[m
+ #include <kern/monitor.h>[m
+ #include <kern/kdebug.h>[m
+[32m+[m[32m#include <kern/trap.h>[m
+ [m
+ #define CMDBUF_SIZE	80	// enough for one VGA text line[m
+ [m
+[36m@@ -130,6 +131,8 @@[m [mmonitor(struct Trapframe *tf)[m
+ 	cprintf("Welcome to the JOS kernel monitor!\n");[m
+ 	cprintf("Type 'help' for a list of commands.\n");[m
+ [m
+[32m+[m	[32mif (tf != NULL)[m
+[32m+[m		[32mprint_trapframe(tf);[m
+ [m
+ 	while (1) {[m
+ 		buf = readline("K> ");[m
+[1mdiff --git a/kern/pmap.c b/kern/pmap.c[m
+[1mindex 7ded31a..869c65c 100644[m
+[1m--- a/kern/pmap.c[m
+[1m+++ b/kern/pmap.c[m
+[36m@@ -8,6 +8,7 @@[m
+ [m
+ #include <kern/pmap.h>[m
+ #include <kern/kclock.h>[m
+[32m+[m[32m#include <kern/env.h>[m
+ [m
+ // These variables are set by i386_detect_memory()[m
+ size_t npages;			// Amount of physical memory (in pages)[m
+[36m@@ -158,6 +159,10 @@[m [mmem_init(void)[m
+ 	memset(pages, 0, npages * sizeof(struct PageInfo));[m
+ [m
+ 	//////////////////////////////////////////////////////////////////////[m
+[32m+[m	[32m// Make 'envs' point to an array of size 'NENV' of 'struct Env'.[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m	[32m//////////////////////////////////////////////////////////////////////[m
+ 	// Now that we've allocated the initial kernel data structures, we set[m
+ 	// up the list of free physical pages. Once we've done so, all further[m
+ 	// memory management will go through the page_* functions. In[m
+[36m@@ -183,6 +188,14 @@[m [mmem_init(void)[m
+ 	cprintf("pages\n");[m
+ [m
+ 	//////////////////////////////////////////////////////////////////////[m
+[32m+[m	[32m// Map the 'envs' array read-only by the user at linear address UENVS[m
+[32m+[m	[32m// (ie. perm = PTE_U | PTE_P).[m
+[32m+[m	[32m// Permissions:[m
+[32m+[m	[32m//    - the new image at UENVS  -- kernel R, user R[m
+[32m+[m	[32m//    - envs itself -- kernel RW, user NONE[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m	[32m//////////////////////////////////////////////////////////////////////[m
+ 	// Use the physical memory that 'bootstack' refers to as the kernel[m
+ 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.[m
+ 	// We consider the entire range from [KSTACKTOP-PTSIZE, KSTACKTOP)[m
+[36m@@ -525,6 +538,51 @@[m [mtlb_invalidate(pde_t *pgdir, void *va)[m
+ 	invlpg(va);[m
+ }[m
+ [m
+[32m+[m[32mstatic uintptr_t user_mem_check_addr;[m
+[32m+[m
+[32m+[m[32m//[m
+[32m+[m[32m// Check that an environment is allowed to access the range of memory[m
+[32m+[m[32m// [va, va+len) with permissions 'perm | PTE_P'.[m
+[32m+[m[32m// Normally 'perm' will contain PTE_U at least, but this is not required.[m
+[32m+[m[32m// 'va' and 'len' need not be page-aligned; you must test every page that[m
+[32m+[m[32m// contains any of that range.  You will test either 'len/PGSIZE',[m
+[32m+[m[32m// 'len/PGSIZE + 1', or 'len/PGSIZE + 2' pages.[m
+[32m+[m[32m//[m
+[32m+[m[32m// A user program can access a virtual address if (1) the address is below[m
+[32m+[m[32m// ULIM, and (2) the page table gives it permission.  These are exactly[m
+[32m+[m[32m// the tests you should implement here.[m
+[32m+[m[32m//[m
+[32m+[m[32m// If there is an error, set the 'user_mem_check_addr' variable to the first[m
+[32m+[m[32m// erroneous virtual address.[m
+[32m+[m[32m//[m
+[32m+[m[32m// Returns 0 if the user program can access this range of addresses,[m
+[32m+[m[32m// and -E_FAULT otherwise.[m
+[32m+[m[32m//[m
+[32m+[m[32mint[m
+[32m+[m[32muser_mem_check(struct Env *env, const void *va, size_t len, int perm)[m
+[32m+[m[32m{[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m	[32mreturn 0;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m//[m
+[32m+[m[32m// Checks that environment 'env' is allowed to access the range[m
+[32m+[m[32m// of memory [va, va+len) with permissions 'perm | PTE_U | PTE_P'.[m
+[32m+[m[32m// If it can, then the function simply returns.[m
+[32m+[m[32m// If it cannot, 'env' is destroyed and, if env is the current[m
+[32m+[m[32m// environment, this function will not return.[m
+[32m+[m[32m//[m
+[32m+[m[32mvoid[m
+[32m+[m[32muser_mem_assert(struct Env *env, const void *va, size_t len, int perm)[m
+[32m+[m[32m{[m
+[32m+[m	[32mif (user_mem_check(env, va, len, perm | PTE_U) < 0) {[m
+[32m+[m		[32mcprintf("[%08x] user_mem_check assertion failure for "[m
+[32m+[m			[32m"va %08x\n", env->env_id, user_mem_check_addr);[m
+[32m+[m		[32menv_destroy(env);	// may not return[m
+[32m+[m	[32m}[m
+[32m+[m[32m}[m
+[32m+[m
+ [m
+ // --------------------------------------------------------------[m
+ // Checking functions.[m
+[36m@@ -703,6 +761,10 @@[m [mcheck_kern_pgdir(void)[m
+ 	for (i = 0; i < n; i += PGSIZE)[m
+ 		assert(check_va2pa(pgdir, UPAGES + i) == PADDR(pages) + i);[m
+ [m
+[32m+[m	[32m// check envs array (new test for lab 3)[m
+[32m+[m	[32mn = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);[m
+[32m+[m	[32mfor (i = 0; i < n; i += PGSIZE)[m
+[32m+[m		[32massert(check_va2pa(pgdir, UENVS + i) == PADDR(envs) + i);[m
+ [m
+ 	// check phys mem[m
+ 	for (i = 0; i < npages * PGSIZE; i += PGSIZE)[m
+[36m@@ -719,6 +781,7 @@[m [mcheck_kern_pgdir(void)[m
+ 		case PDX(UVPT):[m
+ 		case PDX(KSTACKTOP-1):[m
+ 		case PDX(UPAGES):[m
+[32m+[m		[32mcase PDX(UENVS):[m
+ 			assert(pgdir[i] & PTE_P);[m
+ 			break;[m
+ 		default:[m
+[1mdiff --git a/kern/pmap.h b/kern/pmap.h[m
+[1mindex 950cca1..ab0bee9 100644[m
+[1m--- a/kern/pmap.h[m
+[1m+++ b/kern/pmap.h[m
+[36m@@ -8,6 +8,7 @@[m
+ [m
+ #include <inc/memlayout.h>[m
+ #include <inc/assert.h>[m
+[32m+[m[32mstruct Env;[m
+ [m
+ extern char bootstacktop[], bootstack[];[m
+ [m
+[36m@@ -62,6 +63,9 @@[m [mvoid	page_decref(struct PageInfo *pp);[m
+ [m
+ void	tlb_invalidate(pde_t *pgdir, void *va);[m
+ [m
+[32m+[m[32mint	user_mem_check(struct Env *env, const void *va, size_t len, int perm);[m
+[32m+[m[32mvoid	user_mem_assert(struct Env *env, const void *va, size_t len, int perm);[m
+[32m+[m
+ static inline physaddr_t[m
+ page2pa(struct PageInfo *pp)[m
+ {[m
+[1mdiff --git a/kern/syscall.c b/kern/syscall.c[m
+[1mnew file mode 100644[m
+[1mindex 0000000..414d489[m
+[1m--- /dev/null[m
+[1m+++ b/kern/syscall.c[m
+[36m@@ -0,0 +1,80 @@[m
+[32m+[m[32m/* See COPYRIGHT for copyright information. */[m
+[32m+[m
+[32m+[m[32m#include <inc/x86.h>[m
+[32m+[m[32m#include <inc/error.h>[m
+[32m+[m[32m#include <inc/string.h>[m
+[32m+[m[32m#include <inc/assert.h>[m
+[32m+[m
+[32m+[m[32m#include <kern/env.h>[m
+[32m+[m[32m#include <kern/pmap.h>[m
+[32m+[m[32m#include <kern/trap.h>[m
+[32m+[m[32m#include <kern/syscall.h>[m
+[32m+[m[32m#include <kern/console.h>[m
+[32m+[m
+[32m+[m[32m// Print a string to the system console.[m
+[32m+[m[32m// The string is exactly 'len' characters long.[m
+[32m+[m[32m// Destroys the environment on memory errors.[m
+[32m+[m[32mstatic void[m
+[32m+[m[32msys_cputs(const char *s, size_t len)[m
+[32m+[m[32m{[m
+[32m+[m	[32m// Check that the user has permission to read memory [s, s+len).[m
+[32m+[m	[32m// Destroy the environment if not.[m
+[32m+[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m	[32m// Print the string supplied by the user.[m
+[32m+[m	[32mcprintf("%.*s", len, s);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// Read a character from the system console without blocking.[m
+[32m+[m[32m// Returns the character, or 0 if there is no input waiting.[m
+[32m+[m[32mstatic int[m
+[32m+[m[32msys_cgetc(void)[m
+[32m+[m[32m{[m
+[32m+[m	[32mreturn cons_getc();[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// Returns the current environment's envid.[m
+[32m+[m[32mstatic envid_t[m
+[32m+[m[32msys_getenvid(void)[m
+[32m+[m[32m{[m
+[32m+[m	[32mreturn curenv->env_id;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// Destroy a given environment (possibly the currently running environment).[m
+[32m+[m[32m//[m
+[32m+[m[32m// Returns 0 on success, < 0 on error.  Errors are:[m
+[32m+[m[32m//	-E_BAD_ENV if environment envid doesn't currently exist,[m
+[32m+[m[32m//		or the caller doesn't have permission to change envid.[m
+[32m+[m[32mstatic int[m
+[32m+[m[32msys_env_destroy(envid_t envid)[m
+[32m+[m[32m{[m
+[32m+[m	[32mint r;[m
+[32m+[m	[32mstruct Env *e;[m
+[32m+[m
+[32m+[m	[32mif ((r = envid2env(envid, &e, 1)) < 0)[m
+[32m+[m		[32mreturn r;[m
+[32m+[m	[32mif (e == curenv)[m
+[32m+[m		[32mcprintf("[%08x] exiting gracefully\n", curenv->env_id);[m
+[32m+[m	[32melse[m
+[32m+[m		[32mcprintf("[%08x] destroying %08x\n", curenv->env_id, e->env_id);[m
+[32m+[m	[32menv_destroy(e);[m
+[32m+[m	[32mreturn 0;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// Dispatches to the correct kernel function, passing the arguments.[m
+[32m+[m[32mint32_t[m
+[32m+[m[32msyscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)[m
+[32m+[m[32m{[m
+[32m+[m	[32m// Call the function corresponding to the 'syscallno' parameter.[m
+[32m+[m	[32m// Return any appropriate return value.[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m	[32mpanic("syscall not implemented");[m
+[32m+[m
+[32m+[m	[32mswitch (syscallno) {[m
+[32m+[m	[32mdefault:[m
+[32m+[m		[32mreturn -E_INVAL;[m
+[32m+[m	[32m}[m
+[32m+[m[32m}[m
+[32m+[m
+[1mdiff --git a/kern/syscall.h b/kern/syscall.h[m
+[1mnew file mode 100644[m
+[1mindex 0000000..e370801[m
+[1m--- /dev/null[m
+[1m+++ b/kern/syscall.h[m
+[36m@@ -0,0 +1,11 @@[m
+[32m+[m[32m#ifndef JOS_KERN_SYSCALL_H[m
+[32m+[m[32m#define JOS_KERN_SYSCALL_H[m
+[32m+[m[32m#ifndef JOS_KERNEL[m
+[32m+[m[32m# error "This is a JOS kernel header; user programs should not #include it"[m
+[32m+[m[32m#endif[m
+[32m+[m
+[32m+[m[32m#include <inc/syscall.h>[m
+[32m+[m
+[32m+[m[32mint32_t syscall(uint32_t num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5);[m
+[32m+[m
+[32m+[m[32m#endif /* !JOS_KERN_SYSCALL_H */[m
+[1mdiff --git a/kern/trap.c b/kern/trap.c[m
+[1mnew file mode 100644[m
+[1mindex 0000000..e27b556[m
+[1m--- /dev/null[m
+[1m+++ b/kern/trap.c[m
+[36m@@ -0,0 +1,218 @@[m
+[32m+[m[32m#include <inc/mmu.h>[m
+[32m+[m[32m#include <inc/x86.h>[m
+[32m+[m[32m#include <inc/assert.h>[m
+[32m+[m
+[32m+[m[32m#include <kern/pmap.h>[m
+[32m+[m[32m#include <kern/trap.h>[m
+[32m+[m[32m#include <kern/console.h>[m
+[32m+[m[32m#include <kern/monitor.h>[m
+[32m+[m[32m#include <kern/env.h>[m
+[32m+[m[32m#include <kern/syscall.h>[m
+[32m+[m
+[32m+[m[32mstatic struct Taskstate ts;[m
+[32m+[m
+[32m+[m[32m/* For debugging, so print_trapframe can distinguish between printing[m
+[32m+[m[32m * a saved trapframe and printing the current trapframe and print some[m
+[32m+[m[32m * additional information in the latter case.[m
+[32m+[m[32m */[m
+[32m+[m[32mstatic struct Trapframe *last_tf;[m
+[32m+[m
+[32m+[m[32m/* Interrupt descriptor table.  (Must be built at run time because[m
+[32m+[m[32m * shifted function addresses can't be represented in relocation records.)[m
+[32m+[m[32m */[m
+[32m+[m[32mstruct Gatedesc idt[256] = { { 0 } };[m
+[32m+[m[32mstruct Pseudodesc idt_pd = {[m
+[32m+[m	[32msizeof(idt) - 1, (uint32_t) idt[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m
+[32m+[m[32mstatic const char *trapname(int trapno)[m
+[32m+[m[32m{[m
+[32m+[m	[32mstatic const char * const excnames[] = {[m
+[32m+[m		[32m"Divide error",[m
+[32m+[m		[32m"Debug",[m
+[32m+[m		[32m"Non-Maskable Interrupt",[m
+[32m+[m		[32m"Breakpoint",[m
+[32m+[m		[32m"Overflow",[m
+[32m+[m		[32m"BOUND Range Exceeded",[m
+[32m+[m		[32m"Invalid Opcode",[m
+[32m+[m		[32m"Device Not Available",[m
+[32m+[m		[32m"Double Fault",[m
+[32m+[m		[32m"Coprocessor Segment Overrun",[m
+[32m+[m		[32m"Invalid TSS",[m
+[32m+[m		[32m"Segment Not Present",[m
+[32m+[m		[32m"Stack Fault",[m
+[32m+[m		[32m"General Protection",[m
+[32m+[m		[32m"Page Fault",[m
+[32m+[m		[32m"(unknown trap)",[m
+[32m+[m		[32m"x87 FPU Floating-Point Error",[m
+[32m+[m		[32m"Alignment Check",[m
+[32m+[m		[32m"Machine-Check",[m
+[32m+[m		[32m"SIMD Floating-Point Exception"[m
+[32m+[m	[32m};[m
+[32m+[m
+[32m+[m	[32mif (trapno < ARRAY_SIZE(excnames))[m
+[32m+[m		[32mreturn excnames[trapno];[m
+[32m+[m	[32mif (trapno == T_SYSCALL)[m
+[32m+[m		[32mreturn "System call";[m
+[32m+[m	[32mreturn "(unknown trap)";[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m
+[32m+[m[32mvoid[m
+[32m+[m[32mtrap_init(void)[m
+[32m+[m[32m{[m
+[32m+[m	[32mextern struct Segdesc gdt[];[m
+[32m+[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m	[32m// Per-CPU setup[m[41m [m
+[32m+[m	[32mtrap_init_percpu();[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// Initialize and load the per-CPU TSS and IDT[m
+[32m+[m[32mvoid[m
+[32m+[m[32mtrap_init_percpu(void)[m
+[32m+[m[32m{[m
+[32m+[m	[32m// Setup a TSS so that we get the right stack[m
+[32m+[m	[32m// when we trap to the kernel.[m
+[32m+[m	[32mts.ts_esp0 = KSTACKTOP;[m
+[32m+[m	[32mts.ts_ss0 = GD_KD;[m
+[32m+[m	[32mts.ts_iomb = sizeof(struct Taskstate);[m
+[32m+[m
+[32m+[m	[32m// Initialize the TSS slot of the gdt.[m
+[32m+[m	[32mgdt[GD_TSS0 >> 3] = SEG16(STS_T32A, (uint32_t) (&ts),[m
+[32m+[m					[32msizeof(struct Taskstate) - 1, 0);[m
+[32m+[m	[32mgdt[GD_TSS0 >> 3].sd_s = 0;[m
+[32m+[m
+[32m+[m	[32m// Load the TSS selector (like other segment selectors, the[m
+[32m+[m	[32m// bottom three bits are special; we leave them 0)[m
+[32m+[m	[32mltr(GD_TSS0);[m
+[32m+[m
+[32m+[m	[32m// Load the IDT[m
+[32m+[m	[32mlidt(&idt_pd);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mvoid[m
+[32m+[m[32mprint_trapframe(struct Trapframe *tf)[m
+[32m+[m[32m{[m
+[32m+[m	[32mcprintf("TRAP frame at %p\n", tf);[m
+[32m+[m	[32mprint_regs(&tf->tf_regs);[m
+[32m+[m	[32mcprintf("  es   0x----%04x\n", tf->tf_es);[m
+[32m+[m	[32mcprintf("  ds   0x----%04x\n", tf->tf_ds);[m
+[32m+[m	[32mcprintf("  trap 0x%08x %s\n", tf->tf_trapno, trapname(tf->tf_trapno));[m
+[32m+[m	[32m// If this trap was a page fault that just happened[m
+[32m+[m	[32m// (so %cr2 is meaningful), print the faulting linear address.[m
+[32m+[m	[32mif (tf == last_tf && tf->tf_trapno == T_PGFLT)[m
+[32m+[m		[32mcprintf("  cr2  0x%08x\n", rcr2());[m
+[32m+[m	[32mcprintf("  err  0x%08x", tf->tf_err);[m
+[32m+[m	[32m// For page faults, print decoded fault error code:[m
+[32m+[m	[32m// U/K=fault occurred in user/kernel mode[m
+[32m+[m	[32m// W/R=a write/read caused the fault[m
+[32m+[m	[32m// PR=a protection violation caused the fault (NP=page not present).[m
+[32m+[m	[32mif (tf->tf_trapno == T_PGFLT)[m
+[32m+[m		[32mcprintf(" [%s, %s, %s]\n",[m
+[32m+[m			[32mtf->tf_err & 4 ? "user" : "kernel",[m
+[32m+[m			[32mtf->tf_err & 2 ? "write" : "read",[m
+[32m+[m			[32mtf->tf_err & 1 ? "protection" : "not-present");[m
+[32m+[m	[32melse[m
+[32m+[m		[32mcprintf("\n");[m
+[32m+[m	[32mcprintf("  eip  0x%08x\n", tf->tf_eip);[m
+[32m+[m	[32mcprintf("  cs   0x----%04x\n", tf->tf_cs);[m
+[32m+[m	[32mcprintf("  flag 0x%08x\n", tf->tf_eflags);[m
+[32m+[m	[32mif ((tf->tf_cs & 3) != 0) {[m
+[32m+[m		[32mcprintf("  esp  0x%08x\n", tf->tf_esp);[m
+[32m+[m		[32mcprintf("  ss   0x----%04x\n", tf->tf_ss);[m
+[32m+[m	[32m}[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mvoid[m
+[32m+[m[32mprint_regs(struct PushRegs *regs)[m
+[32m+[m[32m{[m
+[32m+[m	[32mcprintf("  edi  0x%08x\n", regs->reg_edi);[m
+[32m+[m	[32mcprintf("  esi  0x%08x\n", regs->reg_esi);[m
+[32m+[m	[32mcprintf("  ebp  0x%08x\n", regs->reg_ebp);[m
+[32m+[m	[32mcprintf("  oesp 0x%08x\n", regs->reg_oesp);[m
+[32m+[m	[32mcprintf("  ebx  0x%08x\n", regs->reg_ebx);[m
+[32m+[m	[32mcprintf("  edx  0x%08x\n", regs->reg_edx);[m
+[32m+[m	[32mcprintf("  ecx  0x%08x\n", regs->reg_ecx);[m
+[32m+[m	[32mcprintf("  eax  0x%08x\n", regs->reg_eax);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mstatic void[m
+[32m+[m[32mtrap_dispatch(struct Trapframe *tf)[m
+[32m+[m[32m{[m
+[32m+[m	[32m// Handle processor exceptions.[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m	[32m// Unexpected trap: The user process or the kernel has a bug.[m
+[32m+[m	[32mprint_trapframe(tf);[m
+[32m+[m	[32mif (tf->tf_cs == GD_KT)[m
+[32m+[m		[32mpanic("unhandled trap in kernel");[m
+[32m+[m	[32melse {[m
+[32m+[m		[32menv_destroy(curenv);[m
+[32m+[m		[32mreturn;[m
+[32m+[m	[32m}[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mvoid[m
+[32m+[m[32mtrap(struct Trapframe *tf)[m
+[32m+[m[32m{[m
+[32m+[m	[32m// The environment may have set DF and some versions[m
+[32m+[m	[32m// of GCC rely on DF being clear[m
+[32m+[m	[32masm volatile("cld" ::: "cc");[m
+[32m+[m
+[32m+[m	[32m// Check that interrupts are disabled.  If this assertion[m
+[32m+[m	[32m// fails, DO NOT be tempted to fix it by inserting a "cli" in[m
+[32m+[m	[32m// the interrupt path.[m
+[32m+[m	[32massert(!(read_eflags() & FL_IF));[m
+[32m+[m
+[32m+[m	[32mcprintf("Incoming TRAP frame at %p\n", tf);[m
+[32m+[m
+[32m+[m	[32mif ((tf->tf_cs & 3) == 3) {[m
+[32m+[m		[32m// Trapped from user mode.[m
+[32m+[m		[32massert(curenv);[m
+[32m+[m
+[32m+[m		[32m// Copy trap frame (which is currently on the stack)[m
+[32m+[m		[32m// into 'curenv->env_tf', so that running the environment[m
+[32m+[m		[32m// will restart at the trap point.[m
+[32m+[m		[32mcurenv->env_tf = *tf;[m
+[32m+[m		[32m// The trapframe on the stack should be ignored from here on.[m
+[32m+[m		[32mtf = &curenv->env_tf;[m
+[32m+[m	[32m}[m
+[32m+[m
+[32m+[m	[32m// Record that tf is the last real trapframe so[m
+[32m+[m	[32m// print_trapframe can print some additional information.[m
+[32m+[m	[32mlast_tf = tf;[m
+[32m+[m
+[32m+[m	[32m// Dispatch based on what type of trap occurred[m
+[32m+[m	[32mtrap_dispatch(tf);[m
+[32m+[m
+[32m+[m	[32m// Return to the current environment, which should be running.[m
+[32m+[m	[32massert(curenv && curenv->env_status == ENV_RUNNING);[m
+[32m+[m	[32menv_run(curenv);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m
+[32m+[m[32mvoid[m
+[32m+[m[32mpage_fault_handler(struct Trapframe *tf)[m
+[32m+[m[32m{[m
+[32m+[m	[32muint32_t fault_va;[m
+[32m+[m
+[32m+[m	[32m// Read processor's CR2 register to find the faulting address[m
+[32m+[m	[32mfault_va = rcr2();[m
+[32m+[m
+[32m+[m	[32m// Handle kernel-mode page faults.[m
+[32m+[m
+[32m+[m	[32m// LAB 3: Your code here.[m
+[32m+[m
+[32m+[m	[32m// We've already handled kernel-mode exceptions, so if we get here,[m
+[32m+[m	[32m// the page fault happened in user mode.[m
+[32m+[m
+[32m+[m	[32m// Destroy the environment that caused the fault.[m
+[32m+[m	[32mcprintf("[%08x] user fault va %08x ip %08x\n",[m
+[32m+[m		[32mcurenv->env_id, fault_va, tf->tf_eip);[m
+[32m+[m	[32mprint_trapframe(tf);[m
+[32m+[m	[32menv_destroy(curenv);[m
+[32m+[m[32m}[m
+[32m+[m
+[1mdiff --git a/kern/trap.h b/kern/trap.h[m
+[1mnew file mode 100644[m
+[1mindex 0000000..36b8758[m
+[1m--- /dev/null[m
+[1m+++ b/kern/trap.h[m
+[36m@@ -0,0 +1,23 @@[m
+[32m+[m[32m/* See COPYRIGHT for copyright information. */[m
+[32m+[m
+[32m+[m[32m#ifndef JOS_KERN_TRAP_H[m
+[32m+[m[32m#define JOS_KERN_TRAP_H[m
+[32m+[m[32m#ifndef JOS_KERNEL[m
+[32m+[m[32m# error "This is a JOS kernel header; user programs should not #include it"[m
+[32m+[m[32m#endif[m
+[32m+[m
+[32m+[m[32m#include <inc/trap.h>[m
+[32m+[m[32m#include <inc/mmu.h>[m
+[32m+[m
+[32m+[m[32m/* The kernel's interrupt descriptor table */[m
+[32m+[m[32mextern struct Gatedesc idt[];[m
+[32m+[m[32mextern struct Pseudodesc idt_pd;[m
+[32m+[m
+[32m+[m[32mvoid trap_init(void);[m
+[32m+[m[32mvoid trap_init_percpu(void);[m
+[32m+[m[32mvoid print_regs(struct PushRegs *regs);[m
+[32m+[m[32mvoid print_trapframe(struct Trapframe *tf);[m
+[32m+[m[32mvoid page_fault_handler(struct Trapframe *);[m
+[32m+[m[32mvoid backtrace(struct Trapframe *);[m
+[32m+[m
+[32m+[m[32m#endif /* JOS_KERN_TRAP_H */[m
+[1mdiff --git a/kern/trapentry.S b/kern/trapentry.S[m
+[1mnew file mode 100644[m
+[1mindex 0000000..22fc640[m
+[1m--- /dev/null[m
+[1m+++ b/kern/trapentry.S[m
+[36m@@ -0,0 +1,55 @@[m
+[32m+[m[32m/* See COPYRIGHT for copyright information. */[m
+[32m+[m
+[32m+[m[32m#include <inc/mmu.h>[m
+[32m+[m[32m#include <inc/memlayout.h>[m
+[32m+[m[32m#include <inc/trap.h>[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m[32m###################################################################[m
+[32m+[m[32m# exceptions/interrupts[m
+[32m+[m[32m###################################################################[m
+[32m+[m
+[32m+[m[32m/* TRAPHANDLER defines a globally-visible function for handling a trap.[m
+[32m+[m[32m * It pushes a trap number onto the stack, then jumps to _alltraps.[m
+[32m+[m[32m * Use TRAPHANDLER for traps where the CPU automatically pushes an error code.[m
+[32m+[m[32m *[m
+[32m+[m[32m * You shouldn't call a TRAPHANDLER function from C, but you may[m
+[32m+[m[32m * need to _declare_ one in C (for instance, to get a function pointer[m
+[32m+[m[32m * during IDT setup).  You can declare the function with[m
+[32m+[m[32m *   void NAME();[m
+[32m+[m[32m * where NAME is the argument passed to TRAPHANDLER.[m
+[32m+[m[32m */[m
+[32m+[m[32m#define TRAPHANDLER(name, num)						\[m
+[32m+[m	[32m.globl name;		/* define global symbol for 'name' */	\[m
+[32m+[m	[32m.type name, @function;	/* symbol type is function */		\[m
+[32m+[m	[32m.align 2;		/* align function definition */		\[m
+[32m+[m	[32mname:			/* function starts here */		\[m
+[32m+[m	[32mpushl $(num);							\[m
+[32m+[m	[32mjmp _alltraps[m
+[32m+[m
+[32m+[m[32m/* Use TRAPHANDLER_NOEC for traps where the CPU doesn't push an error code.[m
+[32m+[m[32m * It pushes a 0 in place of the error code, so the trap frame has the same[m
+[32m+[m[32m * format in either case.[m
+[32m+[m[32m */[m
+[32m+[m[32m#define TRAPHANDLER_NOEC(name, num)					\[m
+[32m+[m	[32m.globl name;							\[m
+[32m+[m	[32m.type name, @function;						\[m
+[32m+[m	[32m.align 2;							\[m
+[32m+[m	[32mname:								\[m
+[32m+[m	[32mpushl $0;							\[m
+[32m+[m	[32mpushl $(num);							\[m
+[32m+[m	[32mjmp _alltraps[m
+[32m+[m
+[32m+[m[32m.text[m
+[32m+[m
+[32m+[m[32m/*[m
+[32m+[m[32m * Lab 3: Your code here for generating entry points for the different traps.[m
+[32m+[m[32m */[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m[32m/*[m
+[32m+[m[32m * Lab 3: Your code here for _alltraps[m
+[32m+[m[32m */[m
+[32m+[m
+[1mdiff --git a/lib/Makefrag b/lib/Makefrag[m
+[1mnew file mode 100644[m
+[1mindex 0000000..2f80706[m
+[1m--- /dev/null[m
+[1m+++ b/lib/Makefrag[m
+[36m@@ -0,0 +1,31 @@[m
+[32m+[m[32mOBJDIRS += lib[m
+[32m+[m
+[32m+[m[32mLIB_SRCFILES :=		lib/console.c \[m
+[32m+[m			[32mlib/libmain.c \[m
+[32m+[m			[32mlib/exit.c \[m
+[32m+[m			[32mlib/panic.c \[m
+[32m+[m			[32mlib/printf.c \[m
+[32m+[m			[32mlib/printfmt.c \[m
+[32m+[m			[32mlib/readline.c \[m
+[32m+[m			[32mlib/string.c \[m
+[32m+[m			[32mlib/syscall.c[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m[32mLIB_OBJFILES := $(patsubst lib/%.c, $(OBJDIR)/lib/%.o, $(LIB_SRCFILES))[m
+[32m+[m[32mLIB_OBJFILES := $(patsubst lib/%.S, $(OBJDIR)/lib/%.o, $(LIB_OBJFILES))[m
+[32m+[m
+[32m+[m[32m$(OBJDIR)/lib/%.o: lib/%.c $(OBJDIR)/.vars.USER_CFLAGS[m
+[32m+[m	[32m@echo + cc[USER] $<[m
+[32m+[m	[32m@mkdir -p $(@D)[m
+[32m+[m	[32m$(V)$(CC) -nostdinc $(USER_CFLAGS) -c -o $@ $<[m
+[32m+[m
+[32m+[m[32m$(OBJDIR)/lib/%.o: lib/%.S $(OBJDIR)/.vars.USER_CFLAGS[m
+[32m+[m	[32m@echo + as[USER] $<[m
+[32m+[m	[32m@mkdir -p $(@D)[m
+[32m+[m	[32m$(V)$(CC) -nostdinc $(USER_CFLAGS) -c -o $@ $<[m
+[32m+[m
+[32m+[m[32m$(OBJDIR)/lib/libjos.a: $(LIB_OBJFILES)[m
+[32m+[m	[32m@echo + ar $@[m
+[32m+[m	[32m$(V)$(AR) r $@ $(LIB_OBJFILES)[m
+[1mdiff --git a/lib/console.c b/lib/console.c[m
+[1mnew file mode 100644[m
+[1mindex 0000000..8856873[m
+[1m--- /dev/null[m
+[1m+++ b/lib/console.c[m
+[36m@@ -0,0 +1,25 @@[m
+[32m+[m
+[32m+[m[32m#include <inc/string.h>[m
+[32m+[m[32m#include <inc/lib.h>[m
+[32m+[m
+[32m+[m[32mvoid[m
+[32m+[m[32mcputchar(int ch)[m
+[32m+[m[32m{[m
+[32m+[m	[32mchar c = ch;[m
+[32m+[m
+[32m+[m	[32m// Unlike standard Unix's putchar,[m
+[32m+[m	[32m// the cputchar function _always_ outputs to the system console.[m
+[32m+[m	[32msys_cputs(&c, 1);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mint[m
+[32m+[m[32mgetchar(void)[m
+[32m+[m[32m{[m
+[32m+[m	[32mint r;[m
+[32m+[m	[32m// sys_cgetc does not block, but getchar should.[m
+[32m+[m	[32mwhile ((r = sys_cgetc()) == 0)[m
+[32m+[m		[32m;[m
+[32m+[m	[32mreturn r;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m
+[1mdiff --git a/lib/entry.S b/lib/entry.S[m
+[1mnew file mode 100644[m
+[1mindex 0000000..222d16c[m
+[1m--- /dev/null[m
+[1m+++ b/lib/entry.S[m
+[36m@@ -0,0 +1,35 @@[m
+[32m+[m[32m#include <inc/mmu.h>[m
+[32m+[m[32m#include <inc/memlayout.h>[m
+[32m+[m
+[32m+[m[32m.data[m
+[32m+[m[32m// Define the global symbols 'envs', 'pages', 'uvpt', and 'uvpd'[m
+[32m+[m[32m// so that they can be used in C as if they were ordinary global arrays.[m
+[32m+[m	[32m.globl envs[m
+[32m+[m	[32m.set envs, UENVS[m
+[32m+[m	[32m.globl pages[m
+[32m+[m	[32m.set pages, UPAGES[m
+[32m+[m	[32m.globl uvpt[m
+[32m+[m	[32m.set uvpt, UVPT[m
+[32m+[m	[32m.globl uvpd[m
+[32m+[m	[32m.set uvpd, (UVPT+(UVPT>>12)*4)[m
+[32m+[m
+[32m+[m
+[32m+[m[32m// Entrypoint - this is where the kernel (or our parent environment)[m
+[32m+[m[32m// starts us running when we are initially loaded into a new environment.[m
+[32m+[m[32m.text[m
+[32m+[m[32m.globl _start[m
+[32m+[m[32m_start:[m
+[32m+[m	[32m// See if we were started with arguments on the stack[m
+[32m+[m	[32mcmpl $USTACKTOP, %esp[m
+[32m+[m	[32mjne args_exist[m
+[32m+[m
+[32m+[m	[32m// If not, push dummy argc/argv arguments.[m
+[32m+[m	[32m// This happens when we are loaded by the kernel,[m
+[32m+[m	[32m// because the kernel does not know about passing arguments.[m
+[32m+[m	[32mpushl $0[m
+[32m+[m	[32mpushl $0[m
+[32m+[m
+[32m+[m[32margs_exist:[m
+[32m+[m	[32mcall libmain[m
+[32m+[m[32m1:	jmp 1b[m
+[32m+[m
+[1mdiff --git a/lib/exit.c b/lib/exit.c[m
+[1mnew file mode 100644[m
+[1mindex 0000000..85c64d6[m
+[1m--- /dev/null[m
+[1m+++ b/lib/exit.c[m
+[36m@@ -0,0 +1,9 @@[m
+[32m+[m
+[32m+[m[32m#include <inc/lib.h>[m
+[32m+[m
+[32m+[m[32mvoid[m
+[32m+[m[32mexit(void)[m
+[32m+[m[32m{[m
+[32m+[m	[32msys_env_destroy(0);[m
+[32m+[m[32m}[m
+[32m+[m
+[1mdiff --git a/lib/libmain.c b/lib/libmain.c[m
+[1mnew file mode 100644[m
+[1mindex 0000000..8a14b29[m
+[1m--- /dev/null[m
+[1m+++ b/lib/libmain.c[m
+[36m@@ -0,0 +1,28 @@[m
+[32m+[m[32m// Calle
