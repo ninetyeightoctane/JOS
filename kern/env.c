@@ -24,7 +24,7 @@ static struct Env *env_free_list;	// Free environment list
 // Set up global descriptor table (GDT) with separate segments for
 // kernel mode and user mode.  Segments serve many purposes on the x86.
 // We don't use any of their memory-mapping capabilities, but we need
-// them to switch privilege levels. 
+// them to switch privilege levels.
 //
 // The kernel and user segments are identical except for the DPL.
 // To load the SS register, the CPL must equal the DPL.  Thus,
@@ -116,7 +116,13 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
-
+	env_free_list = NULL;
+	for(int i = NENV - 1; i >= 0; i--) {
+		envs[i].env_status = ENV_FREE;
+		envs[i].env_id = 0;
+		envs[i].env_link = env_free_list;
+		env_free_list = &envs[i];
+	}
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -128,15 +134,15 @@ env_init_percpu(void)
 	lgdt(&gdt_pd);
 	// The kernel never uses GS or FS, so we leave those set to
 	// the user data segment.
-	asm volatile("movw %%ax,%%gs" : : "a" (GD_UD|3));
-	asm volatile("movw %%ax,%%fs" : : "a" (GD_UD|3));
+	asm volatile("movw %%ax,%%gs" :: "a" (GD_UD|3));
+	asm volatile("movw %%ax,%%fs" :: "a" (GD_UD|3));
 	// The kernel does use ES, DS, and SS.  We'll change between
 	// the kernel and user data segments as needed.
-	asm volatile("movw %%ax,%%es" : : "a" (GD_KD));
-	asm volatile("movw %%ax,%%ds" : : "a" (GD_KD));
-	asm volatile("movw %%ax,%%ss" : : "a" (GD_KD));
+	asm volatile("movw %%ax,%%es" :: "a" (GD_KD));
+	asm volatile("movw %%ax,%%ds" :: "a" (GD_KD));
+	asm volatile("movw %%ax,%%ss" :: "a" (GD_KD));
 	// Load the kernel text segment into CS.
-	asm volatile("ljmp %0,$1f\n 1:\n" : : "i" (GD_KT));
+	asm volatile("ljmp %0,$1f\n 1:\n" :: "i" (GD_KT));
 	// For good measure, clear the local descriptor table (LDT),
 	// since we don't use it.
 	lldt(0);
@@ -179,6 +185,14 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+	e->env_pgdir = (pde_t *)(page2kva(p));
+	for(int i = 0; i < UTOP / PTSIZE; ++i)
+		e->env_pgdir[i] = 0;
+
+	for(int i = UTOP / PTSIZE; i < 1024; ++i)
+		e->env_pgdir[i] = kern_pgdir[i];
+
+	p->pp_ref++;
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -192,7 +206,7 @@ env_setup_vm(struct Env *e)
 // On success, the new environment is stored in *newenv_store.
 //
 // Returns 0 on success, < 0 on failure.  Errors include:
-//	-E_NO_FREE_ENV if all NENV environments are allocated
+//	-E_NO_FREE_ENV if all NENVS environments are allocated
 //	-E_NO_MEM on memory exhaustion
 //
 int
@@ -267,6 +281,18 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+	void* start = (void*)ROUNDDOWN((uint32_t)va, PGSIZE);
+	void* end =  (void*)ROUNDUP((uint32_t)va+len, PGSIZE);
+	void* i;
+	int r;
+	for (i = start; i < end; i += PGSIZE) {
+			struct PageInfo* p = page_alloc(0); //not initialized
+			if(p == NULL)
+				panic("region_alloc: allocation failed\n");
+			r = page_insert(e->env_pgdir, p, i, PTE_U | PTE_W);
+			if(r != 0)
+				panic("region_alloc: %e\n", r);
+	}
 }
 
 //
@@ -296,7 +322,7 @@ load_icode(struct Env *e, uint8_t *binary)
 {
 	// Hints:
 	//  Load each program segment into virtual memory
-	//  at the address specified in the ELF segment header.
+	//  at the address specified in the ELF section header.
 	//  You should only load segments with ph->p_type == ELF_PROG_LOAD.
 	//  Each segment's virtual address can be found in ph->p_va
 	//  and its size in memory can be found in ph->p_memsz.
@@ -323,11 +349,34 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
+	if(e == NULL || binary == NULL)
+		panic("load_icode: invalid environment or binary\n");
+	struct Elf * ElfHeader = (struct Elf *)binary; //is binary in memory now? Y?
+	if(ElfHeader->e_magic != ELF_MAGIC)
+		panic("load_icode: invalid elf format\n");
+	struct Proghdr * ph = (struct Proghdr *) ((uint8_t *) ElfHeader + ElfHeader->e_phoff);
+	struct Proghdr * eph = ph + ElfHeader->e_phnum;
 
+	lcr3(PADDR(e->env_pgdir));
+	for(; ph < eph; ph++) {
+		if(ph->p_type == ELF_PROG_LOAD)
+		{
+			if(ph->p_memsz < ph->p_filesz)
+				panic("load_icode: p_memsz < p_filesz\n");
+			region_alloc(e, (void*)ph->p_va, ph->p_memsz);
+			memmove((void*)ph->p_va, (uint8_t *)binary + ph->p_offset, ph->p_filesz);
+			memset((void*)ph->p_va+ph->p_filesz, 0, ph->p_memsz-ph->p_filesz);
+		}
+	}
+
+	lcr3(PADDR(kern_pgdir));		//why?
+
+	e->env_tf.tf_eip = ElfHeader->e_entry;	//why?
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
+	region_alloc(e, (void*)(USTACKTOP-PGSIZE), PGSIZE);
 }
 
 //
@@ -341,6 +390,13 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+	struct Env * env = NULL;
+	int r = env_alloc(&env, 0);
+	if(r != 0)
+		panic("env_create: %e", r);
+
+	load_icode(env, binary);
+	env->env_type = type;
 }
 
 //
@@ -419,13 +475,12 @@ env_destroy(struct Env *e)
 void
 env_pop_tf(struct Trapframe *tf)
 {
-	asm volatile(
-		"\tmovl %0,%%esp\n"
+	__asm __volatile("movl %0,%%esp\n"
 		"\tpopal\n"
 		"\tpopl %%es\n"
 		"\tpopl %%ds\n"
 		"\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */
-		"\tiret\n"
+		"\tiret"
 		: : "g" (tf) : "memory");
 	panic("iret failed");  /* mostly to placate the compiler */
 }
@@ -457,7 +512,18 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
+	if(e == NULL)
+		panic("env_run: invalid environment\n");
+	if(curenv != e && curenv != NULL) {
+		if(curenv->env_status == ENV_RUNNING)
+			curenv->env_status = ENV_RUNNABLE;
+	}
+	curenv = e;
+	curenv->env_status = ENV_RUNNING;
+	curenv->env_runs++;
+	lcr3(PADDR(curenv->env_pgdir));
+
+	env_pop_tf(&(curenv->env_tf));
 
 	panic("env_run not yet implemented");
 }
-

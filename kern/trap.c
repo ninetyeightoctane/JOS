@@ -51,7 +51,7 @@ static const char *trapname(int trapno)
 		"SIMD Floating-Point Exception"
 	};
 
-	if (trapno < ARRAY_SIZE(excnames))
+	if (trapno < sizeof(excnames)/sizeof(excnames[0]))
 		return excnames[trapno];
 	if (trapno == T_SYSCALL)
 		return "System call";
@@ -63,10 +63,22 @@ void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
-
 	// LAB 3: Your code here.
-
-	// Per-CPU setup 
+	//SETGATE(gate, istrap, sel, off, dpl)
+	//referred by xv6
+	extern uint32_t vectors[];
+	for(int i = 0; i <= T_SYSCALL; i++)
+	{
+		switch (i) {
+			case T_BRKPT:
+			case T_SYSCALL:
+				SETGATE(idt[i], 0, GD_KT, vectors[i], 3);
+				break;
+			default:
+				SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
+		}
+	}
+	// Per-CPU setup
 	trap_init_percpu();
 }
 
@@ -78,7 +90,6 @@ trap_init_percpu(void)
 	// when we trap to the kernel.
 	ts.ts_esp0 = KSTACKTOP;
 	ts.ts_ss0 = GD_KD;
-	ts.ts_iomb = sizeof(struct Taskstate);
 
 	// Initialize the TSS slot of the gdt.
 	gdt[GD_TSS0 >> 3] = SEG16(STS_T32A, (uint32_t) (&ts),
@@ -144,7 +155,27 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-
+	int32_t ret_code;
+	switch (tf->tf_trapno) {
+		case T_BRKPT:
+			monitor(tf);
+			return;
+		case T_PGFLT:
+			page_fault_handler(tf);
+			return;
+		case T_SYSCALL:
+			ret_code = syscall(
+					tf->tf_regs.reg_eax,
+					tf->tf_regs.reg_edx,
+					tf->tf_regs.reg_ecx,
+					tf->tf_regs.reg_ebx,
+					tf->tf_regs.reg_edi,
+					tf->tf_regs.reg_esi);
+			tf->tf_regs.reg_eax = ret_code;
+			return;
+		default:
+			break;
+	}
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -205,6 +236,8 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
+	if ((tf->tf_cs & 3) == 0)
+		panic("Page fault in kernel mode\n");
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
@@ -215,4 +248,3 @@ page_fault_handler(struct Trapframe *tf)
 	print_trapframe(tf);
 	env_destroy(curenv);
 }
-

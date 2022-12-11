@@ -10,6 +10,8 @@
 #include <kern/kclock.h>
 #include <kern/env.h>
 
+#include <kern/trap.h>
+
 // These variables are set by i386_detect_memory()
 size_t npages;			// Amount of physical memory (in pages)
 static size_t npages_basemem;	// Amount of base memory (in pages)
@@ -161,6 +163,8 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	envs = (struct Env *) boot_alloc(NENV * sizeof(struct Env));
+	memset(envs, 0, NENV * sizeof(struct Env));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -185,7 +189,6 @@ mem_init(void)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
 	boot_map_region(kern_pgdir, UPAGES, PTSIZE, PADDR(pages), PTE_U);
-	cprintf("pages\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// Map the 'envs' array read-only by the user at linear address UENVS
@@ -194,6 +197,7 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+	boot_map_region(kern_pgdir, UENVS, PTSIZE, PADDR(envs), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -279,7 +283,9 @@ page_init(void)
 	size_t i;
 	page_free_list = NULL;
 
+	//num_alloc：在extmem区域已经被占用的页的个数
 	int num_alloc = ((uint32_t)boot_alloc(0) - KERNBASE) / PGSIZE;
+	//num_iohole：在io hole区域占用的页数
 	int num_iohole = 96;
 
 	pages[0].pp_ref = 1;
@@ -401,7 +407,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		else
 		{
 			pp->pp_ref++;
-			pgdir[PDX(va)] = page2pa(pp) | PTE_P | PTE_W;
+			pgdir[PDX(va)] = page2pa(pp) | PTE_P | PTE_W | PTE_U;
 			pte_t * pg_table_p = KADDR(page2pa(pp));
 			result = pg_table_p + PTX(va);
 			return result;
@@ -519,10 +525,9 @@ page_remove(pde_t *pgdir, void *va)
 	// Fill this function in
 	pte_t * ptep;
 	struct PageInfo *pp = page_lookup(pgdir, va, &ptep);
-	if(!pp || !(*ptep & PTE_P))
-		return;
-	page_decref(pp);		// the ref count of the physical page should decrement
-	tlb_invalidate(pgdir, va);	// the TLB must be invalidated if you remove an entry from the page table
+	if (--pp->pp_ref == 0)
+		page_free(pp);
+	tlb_invalidate(pgdir, va);
 	*ptep = 0;
 }
 
@@ -562,7 +567,15 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
-
+	uint32_t start = (uint32_t)ROUNDDOWN((char *)va, PGSIZE);
+	uint32_t end = (uint32_t)ROUNDUP((char *)va+len, PGSIZE);
+	for(; start < end; start += PGSIZE) {
+		pte_t *pte = pgdir_walk(env->env_pgdir, (void*)start, 0);
+		if((start >= ULIM) || (pte == NULL) || !(*pte & PTE_P) || ((*pte & perm) != perm)) {
+			user_mem_check_addr = (start < (uint32_t)va ? (uint32_t)va : start);
+			return -E_FAULT;
+		}
+	}
 	return 0;
 }
 
@@ -577,6 +590,7 @@ void
 user_mem_assert(struct Env *env, const void *va, size_t len, int perm)
 {
 	if (user_mem_check(env, va, len, perm | PTE_U) < 0) {
+		print_trapframe(&(env->env_tf));
 		cprintf("[%08x] user_mem_check assertion failure for "
 			"va %08x\n", env->env_id, user_mem_check_addr);
 		env_destroy(env);	// may not return
@@ -606,7 +620,6 @@ check_page_free_list(bool only_low_memory)
 	if (only_low_memory) {
 		// Move pages with lower addresses first in the free
 		// list, since entry_pgdir does not map all pages.
-		cprintf("before hanling low memory question, page_free_list is %x now\n", page_free_list);
 		struct PageInfo *pp1, *pp2;
 		struct PageInfo **tp[2] = { &pp1, &pp2 };
 		for (pp = page_free_list; pp; pp = pp->pp_link) {
@@ -619,7 +632,6 @@ check_page_free_list(bool only_low_memory)
 		page_free_list = pp1;
 	}
 
-	cprintf("after hanling low memory question, page_free_list is %x now\n", page_free_list);
 	// if there's a page that shouldn't be on the free list,
 	// try to make sure it eventually causes trouble.
 	for (pp = page_free_list; pp; pp = pp->pp_link)
