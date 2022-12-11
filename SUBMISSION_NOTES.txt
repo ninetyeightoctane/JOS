@@ -17,3 +17,22 @@ finally got everything running properly
 
 Lab2: 
 completed late
+
+lab3:
+qemu, jos, and git all issues ironed out and working properly now
+
+started lab3 part A
+
+working with a lot of trial and error
+
+the one thing that keeps causing issues for me is typos
+
+started lab3 part B
+
+issue when changing trap_dispatch
+
+had a hard time with using register values as function parameters
+
+had a bug that caused the pade to be different than the pagae directory page
+
+got everything working
